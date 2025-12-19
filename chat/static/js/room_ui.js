@@ -1,0 +1,914 @@
+// ===================================================================
+// ROOM UI MANAGEMENT (room_ui.js)
+// ===================================================================
+
+const REACTION_MAP = {
+    'like': '👍',
+    'love': '❤️',
+    'haha': '😂',
+    'wow': '😮',
+    'dislike': '👎'
+};
+
+let currentReplyId = null; // Track active reply
+
+
+// Inject Reaction Styles
+(function injectReactionStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .reaction-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+            min-height: 24px; /* Ensure space isn't zero to prevent jump */
+        }
+        .reaction-container:empty {
+            min-height: 0; 
+            margin-top: 0;
+        }
+        .reaction-badge {
+            background-color: rgba(31, 41, 55, 0.4);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #E5E7EB;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .reaction-badge:hover {
+            background-color: rgba(55, 65, 81, 0.6);
+        }
+        .reaction-badge.my-reaction {
+            background-color: rgba(67, 56, 202, 0.3); /* Indigo tint */
+            border-color: #4F46E5;
+        }
+        .add-reaction-btn {
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.2s;
+            cursor: pointer;
+            color: #9CA3AF;
+            font-size: 1.1rem;
+            padding: 4px;
+            border-radius: 50%;
+        }
+        .add-reaction-btn:hover {
+            color: #FBBF24;
+            background-color: rgba(255,255,255,0.05);
+        }
+        /* Show button on hover OR if active on mobile (handle via JS/CSS media? simplify to hover for now) */
+        .message-bubble:hover .add-reaction-btn,
+        .message-wrapper:hover .add-reaction-btn {
+            opacity: 1;
+        }
+        
+        /* Mobile: Always slightly visible */
+        @media (max-width: 640px) {
+            .add-reaction-btn {
+                opacity: 0.3;
+            }
+        }
+
+        .reaction-picker-popover {
+            position: absolute;
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            border-radius: 999px;
+            padding: 6px 12px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            top: 100%; /* Show below the bubble */
+            margin-top: 8px; /* Spacing */
+            animation: popIn 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .reaction-option {
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+            line-height: 1;
+        }
+        .reaction-option:hover {
+            transform: scale(1.3);
+        }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.5) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .message-bubble {
+            position: relative; /* Context for picker */
+        }
+
+        /* REPLY STYLES */
+        .reply-preview-bar {
+            position: relative; 
+            width: 100%;
+            background-color: #374161; /* Gray-700 +/- shift */
+            background-color: #374151;
+            /* border-top: 1px solid #4B5563; */
+            border-radius: 0.5rem; /* Match Delete Button */
+            padding: 12px 16px; /* Match Delete Button Padding (0.75rem 1rem) */
+            box-sizing: border-box; /* Ensure padding doesn't expand width */
+            
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 40;
+            animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .reply-preview-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-right: 12px;
+        }
+        .reply-to-label {
+            font-size: 0.75rem;
+            color: #9CA3AF;
+        }
+        .reply-to-label b {
+            color: #60A5FA; /* Blue-400 */
+        }
+        #reply-to-text {
+            color: #E5E7EB;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+        .cancel-reply-btn {
+            background: none;
+            border: none;
+            color: #9CA3AF;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+        }
+        .cancel-reply-btn:hover {
+            background-color: #4B5563;
+            color: #FFFFFF;
+        }
+        .cancel-reply-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .reply-quote {
+            display: block;
+            margin-bottom: 6px;
+            padding: 4px 8px;
+            border-left: 3px solid #60A5FA;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 0 4px 4px 0;
+            font-size: 0.8rem;
+            color: #D1D5DB;
+            cursor: pointer;
+        }
+        .reply-quote-sender {
+            display: block;
+            font-weight: 600;
+            color: #60A5FA;
+            margin-bottom: 2px;
+        }
+        .reply-quote-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+        .reply-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+            cursor: pointer;
+            color: #9CA3AF;
+            font-size: 1rem;
+            padding: 4px;
+            margin: 0 4px;
+        }
+        .message-wrapper:hover .reply-btn,
+        .message-bubble:hover .reply-btn {
+            opacity: 1;
+        }
+        @media (max-width: 640px) {
+            .reply-btn { opacity: 0.5; }
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+function deleteSelectedMessages() {
+    if (selectedMessageIds.length === 0 || !deleteModal) return;
+
+    const allMine = selectedMessageIds.every(id => messageOwnership[id] === fixedUsername);
+
+    if (deleteForAllBtn) deleteForAllBtn.style.display = allMine ? 'inline-flex' : 'none';
+    if (messageCountSpan) messageCountSpan.textContent = selectedMessageIds.length;
+
+    const modalTitle = document.querySelector('#modal-title');
+    const modalBodyText = document.querySelector('#modal-body-text');
+
+    if (modalTitle) modalTitle.textContent = allMine ?
+        `Delete ${selectedMessageIds.length} of Your Message(s)` :
+        `Delete ${selectedMessageIds.length} Message(s)`;
+
+    if (modalBodyText) modalBodyText.textContent = allMine ?
+        'All selected messages are yours. Choose how you want to delete them.' :
+        'Some selected messages belong to others. You can only "Delete for Me Only".';
+
+    deleteModal.style.display = 'flex';
+}
+
+function processDeletion(choiceType) {
+    if (selectedMessageIds.length === 0 || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+
+    chatSocket.send(JSON.stringify({
+        'type': choiceType,
+        'sender': fixedUsername,
+        'message_ids': selectedMessageIds
+    }));
+
+    document.querySelectorAll('.message-selected').forEach(el => el.classList.remove('message-selected'));
+    selectedMessageIds = [];
+    updateDeleteButton();
+}
+
+
+// Updated signature to accept attachment data, reactions, and reply info
+function displayMessage(sender, message, messageId, timestamp = null, suppressScroll = false, attachmentUrl = null, isImage = false, reactions = {}, replyTo = null) {
+    // Safety check for critical DOM element
+    if (!chatLogDom) return;
+
+    const isSystemMessage = sender.startsWith('System') || sender === 'System';
+    const isMe = sender === fixedUsername;
+
+    if (!isSystemMessage) messageOwnership[messageId] = sender;
+    if (document.getElementById('msg-' + messageId)) return;
+
+    const messageWrapper = document.createElement('div');
+    messageWrapper.id = 'msg-' + messageId;
+
+    // UI Classes and styles setup...
+    messageWrapper.style.display = 'flex';
+    messageWrapper.style.marginBottom = '1rem';
+    messageWrapper.classList.add(isSystemMessage ? 'system-message-wrapper' : 'message-wrapper');
+    if (!isSystemMessage) {
+        messageWrapper.style.justifyContent = isMe ? 'flex-end' : 'flex-start';
+
+        messageWrapper.onclick = function (event) {
+            if (event.target.closest('a') || event.target.closest('img')) {
+                event.stopPropagation();
+                if (event.target.closest('img')) {
+                    // Optional: Open image modal
+                }
+                return;
+            }
+
+            if (messageOwnership[messageId] !== fixedUsername) return;
+            const index = selectedMessageIds.indexOf(messageId);
+            if (index > -1) {
+                selectedMessageIds.splice(index, 1);
+                messageWrapper.classList.remove('message-selected');
+            } else {
+                selectedMessageIds.push(messageId);
+                messageWrapper.classList.add('message-selected');
+            }
+            updateDeleteButton();
+        };
+    }
+
+    const messageBubble = document.createElement('div');
+    messageBubble.classList.add(isSystemMessage ? 'system-message-bubble' : 'message-bubble');
+    if (!isSystemMessage) messageBubble.classList.add(isMe ? 'message-mine' : 'message-other');
+
+    if (!isSystemMessage && !isMe) {
+        const senderSpan = document.createElement('span');
+        senderSpan.classList.add('message-sender');
+        senderSpan.textContent = sender;
+        messageBubble.appendChild(senderSpan);
+    }
+
+    // --- REPLY CONTENT RENDERING ---
+    if (replyTo) {
+        const quoteDiv = document.createElement('div');
+        quoteDiv.classList.add('reply-quote');
+        quoteDiv.onclick = () => {
+            const targetMsg = document.getElementById('msg-' + replyTo.message_id);
+            if (targetMsg) {
+                targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetMsg.classList.add('highlight-flash');
+                setTimeout(() => targetMsg.classList.remove('highlight-flash'), 2000);
+            }
+        };
+
+        const quoteSender = document.createElement('span');
+        quoteSender.classList.add('reply-quote-sender');
+        quoteSender.textContent = replyTo.sender;
+
+        const quoteText = document.createElement('span');
+        quoteText.classList.add('reply-quote-text');
+        quoteText.textContent = replyTo.message;
+
+        quoteDiv.appendChild(quoteSender);
+        quoteDiv.appendChild(quoteText);
+        messageBubble.appendChild(quoteDiv);
+    }
+
+    // --- ATTACHMENT RENDERING ---
+    if (attachmentUrl) {
+        const attachmentContainer = document.createElement('div');
+        attachmentContainer.style.marginBottom = '0.5rem';
+
+        if (isImage) {
+            const img = document.createElement('img');
+            img.src = attachmentUrl;
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.style.borderRadius = '8px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => window.open(attachmentUrl, '_blank');
+            attachmentContainer.appendChild(img);
+        } else {
+            const link = document.createElement('a');
+            link.href = attachmentUrl;
+            link.target = '_blank';
+            link.textContent = '📎 Download Attachment';
+            link.style.color = isMe ? '#e0e7ff' : '#4f46e5';
+            link.style.textDecoration = 'underline';
+            attachmentContainer.appendChild(link);
+        }
+        messageBubble.appendChild(attachmentContainer);
+    }
+
+    // --- LINK/EMBED/FORMATTING LOGIC ---
+    let contentHtml = '';
+
+    if (isSystemMessage) {
+        contentHtml = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    } else {
+        const embedResult = embedLink(message);
+
+        if (embedResult.isEmbed) {
+            contentHtml = embedResult.content;
+        } else {
+            let linkedText = linkify(message);
+
+            // --- MENTION PARSING ---
+            // Find @username and wrap it in a span.
+            // Check if the mentioned username matches the current user's username for special styling.
+            linkedText = linkedText.replace(/@(\w+)/g, function (match, username) {
+                if (username === fixedUsername) {
+                    return `<span class="mention-me">@${username}</span>`;
+                } else {
+                    return `<span class="mention">@${username}</span>`;
+                }
+            });
+            // -----------------------
+
+            contentHtml = linkedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+    }
+    // --- END LOGIC ---
+
+    const content = document.createElement('p');
+    content.innerHTML = contentHtml;
+
+    // Optimization for embeds: remove the default <p> element spacing
+    if (contentHtml.trim().startsWith('<a href') && contentHtml.includes('block mt-2 mb-1 p-3')) {
+        content.style.margin = '0';
+        content.style.padding = '0';
+    }
+
+    messageBubble.appendChild(content);
+
+
+    if (!isSystemMessage) {
+        const timeSpan = document.createElement('span');
+        timeSpan.classList.add('message-timestamp');
+        // FIX CONFIRMED: Using the actual timestamp variable passed to the function
+        timeSpan.textContent = formatTimestamp(timestamp);
+
+        // --- ADD REACTION BUTTON ---
+        const reactBtn = document.createElement('span');
+        reactBtn.classList.add('add-reaction-btn');
+        reactBtn.innerHTML = '<i class="far fa-smile"></i>'; // FontAwesome icon
+        reactBtn.title = "Add Reaction";
+        reactBtn.style.alignSelf = 'center';
+        reactBtn.style.margin = '0 8px';
+        reactBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleReactionPicker(messageId, messageBubble);
+        };
+
+        // --- ADD REPLY BUTTON ---
+        const replyBtn = document.createElement('span');
+        replyBtn.classList.add('reply-btn');
+        replyBtn.innerHTML = '<i class="fas fa-reply"></i>'; // FontAwesome icon
+        replyBtn.title = "Reply";
+        replyBtn.style.alignSelf = 'center';
+        replyBtn.onclick = (e) => {
+            e.stopPropagation();
+            startReply(messageId, sender, message);
+        };
+
+        // Append Reaction button next to timestamp
+        messageBubble.appendChild(timeSpan);
+
+        // Append elements to wrapper based on side
+        // If Me: Button First (Left of Bubble)
+        if (isMe) {
+            messageWrapper.appendChild(replyBtn); // Reply Button far left
+            messageWrapper.appendChild(reactBtn); // React Button
+            messageWrapper.appendChild(messageBubble);
+        } else {
+            // If Other: Bubble First, then Button (Right of Bubble)
+            messageWrapper.appendChild(messageBubble);
+            messageWrapper.appendChild(reactBtn); // React Button
+            messageWrapper.appendChild(replyBtn); // Reply Button far right (or swap order if desired)
+        }
+    } else {
+        // System message just appends bubble
+        messageWrapper.appendChild(messageBubble);
+    }
+
+    // --- REACTION CONTAINER ---
+    const reactionContainer = document.createElement('div');
+    reactionContainer.id = `reactions-${messageId}`;
+    reactionContainer.classList.add('reaction-container');
+    messageBubble.appendChild(reactionContainer);
+
+    // Initial Render
+    updateMessageReactions(messageId, reactions);
+
+    chatLogDom.appendChild(messageWrapper);
+
+    if (!suppressScroll && !isReceivingHistory) {
+        chatLogDom.scrollTop = chatLogDom.scrollHeight;
+    }
+}
+
+function updateTypingIndicator(users) {
+    if (!typingIndicatorDom) return;
+
+    const othersTyping = users.filter(user => user !== fixedUsername);
+
+    if (othersTyping.length === 0) {
+        typingIndicatorDom.innerHTML = '';
+        typingIndicatorDom.classList.add('hidden');
+    } else {
+        typingIndicatorDom.classList.remove('hidden');
+        let indicatorText = '';
+        if (othersTyping.length === 1) {
+            indicatorText = `<span class="font-semibold text-white">${othersTyping[0]}</span> is typing...`;
+        } else if (othersTyping.length === 2) {
+            indicatorText = `<span class="font-semibold text-white">${othersTyping[0]}</span> and <span class="font-semibold text-white">${othersTyping[1]}</span> are typing...`;
+        } else {
+            const firstTwo = othersTyping.slice(0, 2).join(', ');
+            indicatorText = `<span class="font-semibold text-white">${firstTwo}</span> and ${othersTyping.length - 2} others are typing...`;
+        }
+
+        const dotsHTML = `<div class="typing-indicator-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+        typingIndicatorDom.innerHTML = indicatorText + dotsHTML;
+    }
+}
+
+function toggleUserList() {
+    if (userListDrawer) {
+        userListDrawer.classList.toggle('is-open');
+        document.body.classList.toggle('no-scroll');
+    }
+}
+
+function updateUserListDisplay(users) {
+    if (!userListContainer) return;
+
+    const otherUsers = users.filter(user => user !== fixedUsername);
+    const currentUser = users.find(user => user === fixedUsername);
+    otherUsers.sort((a, b) => a.localeCompare(b));
+    const sortedUsers = currentUser ? [currentUser, ...otherUsers] : otherUsers;
+
+    userListContainer.innerHTML = '';
+
+    sortedUsers.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user;
+        li.classList.add('user-list-item-base');
+
+        if (user === fixedUsername) {
+            li.textContent += ' (You)';
+            li.classList.add('current-user-highlight');
+        }
+        userListContainer.appendChild(li);
+    });
+
+    // --- UPDATE GLOBAL PARTICIPANTS LIST FOR MENTIONS ---
+    window.availableParticipants = sortedUsers;
+    console.log("Updated participants for mentions:", window.availableParticipants);
+}
+
+function updateDeleteButton() {
+    const deleteBtn = document.querySelector('#delete-selected-btn');
+    if (deleteBtn) {
+        if (selectedMessageIds.length > 0) {
+            deleteBtn.classList.remove('hidden');
+            deleteBtn.style.display = 'block'; // Ensure it overrides any other hiding mechanisms
+        } else {
+            deleteBtn.classList.add('hidden');
+            deleteBtn.style.display = 'none';
+        }
+    }
+}
+
+function handleMessageDeletion(messageIds) {
+    messageIds.forEach(id => {
+        const msgElement = document.getElementById('msg-' + id);
+        if (msgElement) {
+            msgElement.remove();
+            if (messageOwnership) delete messageOwnership[id];
+            if (selectedMessageIds) {
+                const selectedIndex = selectedMessageIds.indexOf(id);
+                if (selectedIndex > -1) selectedMessageIds.splice(selectedIndex, 1);
+            }
+        }
+    });
+    updateDeleteButton();
+    if (deleteModal) deleteModal.style.display = 'none';
+}
+
+function updateBellIconColor(count) {
+    if (!bellIconDom) return;
+    const numericCount = parseInt(count);
+
+    if (numericCount > 0) {
+        bellIconDom.classList.add('notification-active');
+    } else {
+        bellIconDom.classList.remove('notification-active');
+    }
+}
+
+function updateRequestPanelContent() {
+    if (!isOwner || !pendingRequestsContainer) return;
+
+    const noRequestsMessage = pendingRequestsContainer.querySelector('.no-requests-message');
+    if (noRequestsMessage) noRequestsMessage.remove();
+
+    if (parseInt(requestCountSpan.textContent) === 0 && pendingRequestsContainer.children.length === 0) {
+        pendingRequestsContainer.innerHTML = '<p class="no-requests-message" style="color: #9CA3AF; padding: 10px; text-align: center;">No Requests...</p>';
+    }
+}
+
+function displayRequestCard(requester, updateCount = true) {
+    const requestId = 'req-' + requester;
+    if (document.getElementById(requestId)) return;
+
+    const noRequestsMessage = pendingRequestsContainer.querySelector('.no-requests-message');
+    if (noRequestsMessage) noRequestsMessage.remove();
+
+    const requestWrapper = document.createElement('div');
+    requestWrapper.id = requestId;
+    requestWrapper.classList.add('request-card-wrapper', 'system-message-wrapper');
+
+    const card = document.createElement('div');
+    card.classList.add('request-card-bubble', 'system-message-bubble');
+
+    const messageP = document.createElement('p');
+    messageP.classList.add('request-message-text');
+    messageP.innerHTML = `**${requester}** is requesting to join.`;
+
+    const buttonGroup = document.createElement('div');
+    buttonGroup.classList.add('request-button-group');
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.textContent = 'Accept';
+    acceptBtn.classList.add('request-accept-btn');
+    acceptBtn.onclick = () => sendApprovalDecision('accept', requester);
+
+    const denyBtn = document.createElement('button');
+    denyBtn.textContent = 'Deny';
+    denyBtn.classList.add('request-deny-btn');
+    denyBtn.onclick = () => sendApprovalDecision('deny', requester);
+
+    buttonGroup.appendChild(acceptBtn);
+    buttonGroup.appendChild(denyBtn);
+    card.appendChild(messageP);
+    card.appendChild(buttonGroup);
+    requestWrapper.appendChild(card);
+
+    pendingRequestsContainer.appendChild(requestWrapper);
+
+    if (updateCount) {
+        const currentCount = parseInt(requestCountSpan.textContent);
+        requestCountSpan.textContent = currentCount + 1;
+        updateBellIconColor(currentCount + 1);
+    }
+}
+
+function confirmAndLeave() {
+    const participantCount = getParticipantCountValue();
+    const redirectToLobby = () => {
+        isUserLeaving = true;
+
+        // --- FIX 2B: Clear the unload handler before navigating ---
+        disableExitPrevention();
+
+        // FAILSAFE: Send explicit leave signal (handled by server to remove user from list)
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            console.log("Sending explicit_leave signal...");
+            chatSocket.send(JSON.stringify({ 'type': 'explicit_leave', 'sender': fixedUsername }));
+        }
+
+        if (chatSocket) chatSocket.close();
+
+        sessionStorage.setItem('user_left_room', 'true');
+        const redirectUrl = `/chat/lobby/?username=${fixedUsername}`;
+        window.location.replace(redirectUrl);
+    };
+
+    // 1. Owner Check Logic (Block leaving if others present)
+    if (isOwner && participantCount > 1) {
+        Swal.fire({
+            title: 'Cannot Leave Room!',
+            html: `
+                <p class="text-lg">You cannot leave while <strong style="color: #FBBF24;">${participantCount - 1} other participant(s)</strong> are still active!</p>
+                <p class="text-sm mt-3" style="color: #9CA3AF;">Please wait for all other participants to leave before you exit the room and close the session.</p>
+            `,
+            icon: 'warning',
+            customClass: { container: 'mobile-alert-responsive-container' },
+            confirmButtonText: 'Stay in Room',
+            confirmButtonColor: '#4F46E5'
+        });
+        return;
+    }
+
+    // 2. Owner is last person: Offer delete options
+    if (isOwner && participantCount <= 1) {
+        Swal.fire({
+            title: 'Confirm Exit and Close Room',
+            html: 'You may leave the room now.<br> <strong class="text-red-400">Select "Leave and Delete Room".</strong>',
+            icon: 'warning',
+            customClass: { container: 'mobile-alert-responsive-container' },
+            showCancelButton: true,
+            showDenyButton: false,
+
+            // Button Colors
+            confirmButtonColor: '#DC2626', // Red for immediate Delete
+            // denyButtonColor: '#4B5563',
+            cancelButtonColor: '#4B5563',
+
+            // Button Texts
+            confirmButtonText: 'Yes, Leave and Delete Room', // Deletes immediately via WS
+            // denyButtonText: 'Stay in Room',
+            cancelButtonText: 'Stay in Room'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // ACTION: Send DELETE command via WebSocket immediately, then redirect.
+                sendDeleteRoom();
+                redirectToLobby();
+            } else if (result.isDenied) {
+                // ACTION: Standard exit without deletion signal
+                redirectToLobby();
+            }
+            // If cancelled, do nothing
+        });
+
+    } else {
+        // 3. Non-Owner logic
+        const title = 'Are you sure you want to leave?';
+        const htmlText = 'You will be disconnected from the chat. You will not be able to view previous messages when you rejoin.';
+
+        Swal.fire({
+            title: title,
+            html: htmlText,
+            icon: 'warning',
+            customClass: { container: 'mobile-alert-responsive-container' },
+            showCancelButton: true,
+            confirmButtonColor: '#DC2626',
+            cancelButtonColor: '#4B5563',
+            confirmButtonText: 'Yes, Leave Room',
+            cancelButtonText: 'Stay in Room'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                redirectToLobby();
+            }
+        });
+    }
+}
+
+// --- NEW: MENTION LOGIC ---
+
+function hideMentionSuggestions() {
+    const suggestionsEl = document.getElementById('mention-suggestions');
+    if (suggestionsEl) {
+        suggestionsEl.classList.add('hidden');
+        suggestionsEl.style.display = 'none !important'; // Force hide
+        suggestionsEl.style.removeProperty('display'); // Or just remove the inline style to let class take over
+        suggestionsEl.innerHTML = '';
+    }
+}
+
+function renderMentionSuggestions(users, query) {
+    const suggestionsEl = document.getElementById('mention-suggestions');
+    if (!suggestionsEl) {
+        console.error("Mention suggestion DOM element not found!");
+        return;
+    }
+
+    // Clear previous
+    suggestionsEl.innerHTML = '';
+
+    if (users.length === 0) {
+        hideMentionSuggestions();
+        return;
+    }
+
+    // console.log("Rendering suggestions for:", users);
+
+    users.forEach(user => {
+        const item = document.createElement('div');
+        item.classList.add('mention-item');
+
+        // Avatar (initials)
+        const avatar = document.createElement('div');
+        avatar.classList.add('mention-avatar');
+        avatar.textContent = user.charAt(0).toUpperCase();
+
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('mention-name');
+        nameSpan.textContent = user;
+
+        item.appendChild(avatar);
+        item.appendChild(nameSpan);
+
+        item.onclick = function () {
+            selectMention(user, query);
+        };
+
+        suggestionsEl.appendChild(item);
+    });
+
+    // Explicitly set display to flex (or block) to override any hidden class issues
+    suggestionsEl.classList.remove('hidden');
+    suggestionsEl.style.display = 'flex';
+    console.log("Suggestions rendered and displayed:", suggestionsEl);
+}
+
+function selectMention(username, query) {
+    if (!messageInputDom) return;
+
+    const cursorPosition = messageInputDom.selectionStart;
+    const textBeforeCursor = messageInputDom.value.substring(0, cursorPosition);
+    const textAfterCursor = messageInputDom.value.substring(cursorPosition);
+
+    // Find the last '@'
+    const lastAtPos = textBeforeCursor.lastIndexOf('@');
+
+    // Construct new text
+    // Replace text from lastAtPos up to cursor with "@username "
+    const newTextBefore = textBeforeCursor.substring(0, lastAtPos) + `@${username} `;
+
+    messageInputDom.value = newTextBefore + textAfterCursor;
+
+    // Move cursor to end of inserted name
+    const newCursorPos = newTextBefore.length;
+    messageInputDom.setSelectionRange(newCursorPos, newCursorPos);
+    messageInputDom.focus();
+
+    messageInputDom.focus();
+    messageInputDom.focus();
+    hideMentionSuggestions();
+}
+
+function startReply(id, sender, content) {
+    currentReplyId = id;
+    const previewBar = document.getElementById('reply-preview-bar');
+    const replySender = document.getElementById('reply-to-sender');
+    const replyText = document.getElementById('reply-to-text');
+    const cancelBtn = document.getElementById('cancel-reply-btn');
+
+    if (previewBar) {
+        replySender.textContent = sender;
+        replyText.textContent = content;
+        previewBar.classList.remove('hidden');
+
+        if (messageInputDom) messageInputDom.focus();
+    }
+}
+
+function cancelReply() {
+    currentReplyId = null;
+    const previewBar = document.getElementById('reply-preview-bar');
+    const replySender = document.getElementById('reply-to-sender');
+    const replyText = document.getElementById('reply-to-text');
+
+    if (previewBar) {
+        previewBar.classList.add('hidden');
+    }
+    if (replySender) replySender.textContent = '';
+    if (replyText) replyText.textContent = '';
+}
+
+// Global Event Listener for Cancel Button
+(function bindCancelButton() {
+    const cancelBtn = document.getElementById('cancel-reply-btn');
+    if (cancelBtn) {
+        console.log("Binding Cancel Reply Button...");
+        cancelBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Cancel Reply Clicked");
+            cancelReply();
+        };
+    } else {
+        console.warn("Cancel Reply Button not found in DOM during bind attempt.");
+    }
+})();
+
+// --- REACTION HELPERS ---
+
+function toggleReactionPicker(messageId, bubbleElement) {
+    // Check if picker already exists
+    const existingPicker = bubbleElement.querySelector('.reaction-picker-popover');
+    if (existingPicker) {
+        existingPicker.remove();
+        return;
+    }
+
+    // Close other pickers
+    document.querySelectorAll('.reaction-picker-popover').forEach(el => el.remove());
+
+    const picker = document.createElement('div');
+    picker.classList.add('reaction-picker-popover');
+
+    // Position depends on user (mine vs other)
+    const isMine = bubbleElement.classList.contains('message-mine');
+    picker.style.right = isMine ? '0' : 'auto';
+    picker.style.left = isMine ? 'auto' : '0';
+
+    Object.keys(REACTION_MAP).forEach(key => {
+        const option = document.createElement('span');
+        option.classList.add('reaction-option');
+        option.textContent = REACTION_MAP[key];
+        option.onclick = (e) => {
+            e.stopPropagation();
+            sendReaction(messageId, key);
+            picker.remove();
+        };
+        picker.appendChild(option);
+    });
+
+    bubbleElement.appendChild(picker);
+
+    // Auto-close on outside click (handled by global listener slightly or added here)
+    const closeListener = (e) => {
+        if (!picker.contains(e.target) && !bubbleElement.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closeListener);
+        }
+    };
+    // Delay adding listener to avoid immediate trigger
+    setTimeout(() => document.addEventListener('click', closeListener), 0);
+}
+
+function updateMessageReactions(messageId, reactionsData) {
+    const container = document.getElementById(`reactions-${messageId}`);
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!reactionsData || Object.keys(reactionsData).length === 0) return;
+
+    Object.keys(reactionsData).forEach(emojiKey => {
+        const users = reactionsData[emojiKey];
+        if (!users || users.length === 0) return;
+
+        const emojiChar = REACTION_MAP[emojiKey] || emojiKey; // Fallback
+        const count = users.length;
+        const isMyReaction = users.includes(fixedUsername);
+
+        const badge = document.createElement('div');
+        badge.classList.add('reaction-badge');
+        if (isMyReaction) badge.classList.add('my-reaction');
+
+        badge.innerHTML = `${emojiChar} <span style="font-size: 0.75rem; font-weight: 600;">${count}</span>`;
+        badge.title = users.join(', '); // Tooltip with usernames
+
+        // Clicking badge also toggles/adds that reaction
+        badge.onclick = (e) => {
+            e.stopPropagation();
+            sendReaction(messageId, emojiKey);
+        };
+
+        container.appendChild(badge);
+    });
+}

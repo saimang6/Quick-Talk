@@ -1,0 +1,1418 @@
+/* Base styles for Body and HTML */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    color: white;
+    background-color: #111827;
+    /* Ensure font sizes are based on a standard for scaling */
+    font-size: 16px;
+    /* Prevent scrolling and potential swipe interference at the body level */
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
+}
+
+/* UTILITY: Hidden Class */
+.hidden {
+    display: none !important;
+}
+
+/* SCROLL CONTROL: Prevents background scrolling when mobile menu is open */
+body.no-scroll {
+    overflow: hidden;
+}
+
+/* SCROLLBAR HIDING */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.request-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Animated Pulse for the Icon */
+.icon-pulse {
+    width: 80px;
+    height: 80px;
+    background: rgba(251, 191, 36, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    animation: pulse-amber 2s infinite;
+}
+
+@keyframes pulse-amber {
+    0% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 20px rgba(251, 191, 36, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    }
+}
+
+/* The New Hero Button */
+.hero-request-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 80%;
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    overflow: hidden;
+}
+
+.hero-request-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(79, 70, 229, 0.4);
+    filter: brightness(1.1);
+}
+
+.hero-request-btn:active {
+    transform: translateY(-1px);
+}
+
+/* Loading/Sent State (can be toggled via JS) */
+.hero-request-btn.sent {
+    background: #059669;
+    /* Green-600 */
+    pointer-events: none;
+}
+
+/* HEIGHT & CENTERING LOGIC (full-screen-wrapper) */
+/* Adjusted height to 100vh for a true mobile app experience */
+.full-screen-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    min-height: 100vh;
+}
+
+/* MAIN CONTAINER (Should take full screen on mobile) */
+.main-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    /* Use 100% of parent container */
+    max-width: 1200px;
+    /* Max width for desktop views */
+    margin: 0 auto;
+    border-left: 1px solid #4B5563;
+    border-right: 1px solid #4B5563;
+}
+
+/* ========================================================= */
+/* --- REVISED HEADER STYLES (MATCHING HTML STRUCTURE) --- */
+/* ========================================================= */
+
+.chat-header {
+    /* Main container: Left, Center, Right layout */
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.2rem 1.5rem;
+    /* Slightly tighter padding */
+    background-color: #1F2937;
+    /* Dark Gray background */
+    border-bottom: 1px solid #374151;
+    min-height: 60px;
+    flex-shrink: 0;
+    /* Added subtle gradient for better aesthetics */
+    background: linear-gradient(180deg, #0f1419 10%, #6b98d3 100%);
+}
+
+.header-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.roomname-creator {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 15px;
+}
+
+#room-name-display {
+    font-weight: 800;
+    margin: 0;
+    color: #F9FAFB;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.room-title {
+    font-size: 1.6rem;
+}
+
+.creator-info {
+    font-size: 1.1rem;
+    color: #9CA3AF;
+    margin: 0;
+}
+
+.creator-info span {
+    font-weight: 600;
+    color: #10B981;
+    /* Green highlight for owner */
+}
+
+.current-username {
+    font-size: 1.3rem;
+    padding: 0;
+
+}
+
+.user-profile-display {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-end;
+    gap: 15px;
+}
+
+/* Right: Leave Button */
+.hamburger-leave-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: end;
+}
+
+.leave-button {
+    padding: 0.5rem 1rem;
+    background-color: #EF4444;
+    /* Red button */
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.leave-button:hover {
+    background-color: #DC2626;
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* NEW: Hamburger Button (Hidden by default on desktop) */
+.hamburger-button {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin-top: 5px;
+}
+
+.hamburger-button svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* ========================================================= */
+/* --- NEW: USER LIST DRAWER & CHAT AREA LAYOUT --- */
+/* ========================================================= */
+
+/* Wrapper for chat log and user list (Flex container for side-by-side) */
+.chat-area-and-drawer-wrapper {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* User List Drawer (Default: Desktop/Docked) */
+.user-list-drawer {
+    width: 250px;
+    background-color: #1F2937;
+    border-left: 1px solid #374151;
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 1rem;
+    transition: transform 0.3s ease-in-out;
+    /* Default state is docked (visible) */
+    transform: translateX(0);
+}
+
+.user-list-title {
+    color: #E5E7EB;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 0.5rem;
+}
+
+.user-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* --- NEW: Base style for ALL list items --- */
+.user-list-item-base {
+    padding: 0.75rem;
+    /* p-3 */
+    color: #F9FAFB;
+    /* text-white/lighter */
+    background-color: rgba(55, 65, 81, 0.5);
+    /* bg-gray-700/50 */
+    border-radius: 0.5rem;
+    /* rounded-lg */
+    margin-bottom: 0.5rem;
+    /* mb-2 */
+    font-weight: 500;
+    /* font-medium */
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+/* --- NEW: Highlight for the current user --- */
+.current-user-highlight {
+    background-color: #4F46E5 !important;
+    /* Strong Indigo/Blue */
+    font-weight: 700;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    /* Subtle emphasis */
+    transform: scale(1.02);
+    color: #fff;
+    border: 1px solid #6366F1;
+}
+
+/* Existing legacy .user-list li removed as .user-list-item-base replaces it */
+
+/* Drawer Backdrop (Used only on mobile, hidden on desktop) */
+.drawer-backdrop {
+    display: none;
+}
+
+/* CHAT LOG STYLES */
+.chat-log-box {
+    flex: 1 1 0%;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+/* ========================================================= */
+/* --- TYPING INDICATOR STYLES (Fixed) --- */
+/* ========================================================= */
+
+/* Ensure the container has the correct display settings */
+.typing-indicator-container {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: #9CA3AF;
+    font-size: 0.85rem;
+    line-height: 1.25;
+    min-height: 24px;
+    margin-bottom: 0.5rem;
+}
+
+/* .typing-indicator-container {
+    display: block; 
+    padding: 8px 16px 0px 16px;
+    margin-bottom: 0;
+    color: #9CA3AF; 
+    font-size: 0.85rem;
+    line-height: 1.25;
+    min-height: 24px; 
+} */
+
+/* General Styles for the Request Approval Overlay */
+/* .hidden-chat-interface rule removed (empty) */
+
+/* This is the container for the dots themselves */
+.typing-indicator-dots {
+    display: flex;
+    align-items: center;
+    height: 10px;
+}
+
+/* The individual dot element */
+.typing-dot {
+    width: 6px;
+    height: 6px;
+    margin: 0 2px;
+    background-color: #6366F1;
+    /* Indigo color */
+    border-radius: 50%;
+    opacity: 0.6;
+    animation: dot-pulse 1.4s infinite ease-in-out both;
+}
+
+/* Delay the animation for each dot */
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0s;
+}
+
+/* Keyframe animation for the pulsing effect */
+@keyframes dot-pulse {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+
+    40% {
+        transform: scale(1.0);
+        opacity: 1;
+    }
+}
+
+.delete-popup {
+    background-color: black;
+    padding: 1.2rem;
+    border: none;
+    border-radius: 0.5rem;
+}
+
+/* FOOTER/INPUT AREA STYLES */
+.chat-footer {
+    padding: 1rem;
+    background-color: #1F2937;
+    border-top: 1px solid #4B5563;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* INPUT FIELD BASE STYLES */
+.chat-input-base {
+    width: 92%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    color: white;
+}
+
+.chat-input-base::placeholder {
+    color: #9CA3AF;
+}
+
+.chat-input-base:focus {
+    outline: none;
+}
+
+/* MESSAGE INPUT CONTAINER */
+.system-message-wrapper {
+    justify-content: center;
+}
+
+.message-input-container {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.message-input {
+    flex-grow: 1;
+    padding: 0.95rem 0.2rem;
+    font-size: 1rem;
+    background-color: transparent;
+    border: none;
+}
+
+.emoji-input-container {
+    display: flex;
+    width: 94%;
+    align-items: center;
+    justify-content: flex-start;
+    background-color: #374151;
+    border: 1px solid #4B5563;
+    border-radius: 9999px;
+}
+
+/* BUTTON BASE STYLES */
+.chat-button {
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    font-size: 1rem;
+    /* Base font size */
+}
+
+.send-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.send-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(79, 70, 229, 0.4);
+    filter: brightness(1.1);
+}
+
+.send-button:active {
+    transform: translateY(0);
+}
+
+/* Disabled state for when the input is empty */
+.send-button:disabled {
+    background: #D1D5DB;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.delete-button {
+    background-color: #DC2626;
+    color: white;
+    border-radius: 0.5rem;
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    /* Slightly larger padding */
+}
+
+.delete-button:hover {
+    background-color: #B91C1C;
+}
+
+/* MESSAGE BUBBLE BASE STYLES */
+.message-bubble {
+    max-width: fit-content;
+    padding: 0.5rem 1rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-size: 1rem;
+    /* Base font size */
+    line-height: 1.6;
+    transition: all 0.15s ease-in-out;
+    position: relative;
+    cursor: pointer;
+}
+
+.message-bubble p {
+    margin: 5px 0px;
+    /* overflow-wrap: break-word; 
+    word-break: break-word; */
+}
+
+.message-mine {
+    background-color: #4F46E5;
+    color: white;
+    border-bottom-right-radius: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.message-mine .full-link {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.message-mine .text-link {
+    text-align: end;
+}
+
+.message-other {
+    background-color: #374151;
+    color: white;
+    border: 1px solid #4B5563;
+    border-top-left-radius: 0.25rem;
+}
+
+.message-sender {
+    display: block;
+    font-weight: 700;
+    font-size: 0.75rem;
+    /* Slightly smaller sender name */
+    margin-bottom: 0.2rem;
+    color: #818CF8;
+}
+
+.message-selected {
+    /* outline: 2px solid #FCD34D;
+    box-shadow: 0 0 0 2px #FCD34D; */
+    outline: 2px solid #6366F1;
+    /* A lighter indigo/blue for the outline */
+    box-shadow: 0 0 0 2px #6366F1, 0 0 10px rgba(99, 102, 241, 0.5);
+    /* Matching glow */
+    background-color: #374151;
+}
+
+.message-mine.message-selected {
+    background-color: #5A5CDE;
+    /* A slightly lighter indigo for your selected messages */
+}
+
+/* 🚀 MOBILE ENHANCEMENTS: Target typical phone screens (480px and smaller) */
+@media (max-width: 450px) {
+
+    /* Increase Base Font Size for mobile to scale everything up */
+    html,
+    body {
+        font-size: 18px;
+        /* Scales everything by ~12.5% */
+    }
+
+    /* --- Header adjustments for small screens --- */
+    .chat-header {
+        padding: 1rem 0.85rem;
+    }
+
+    .current-user-badge,
+    .leave-room-btn-style {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+    }
+
+    #room-name-display {
+        font-size: 1.1rem;
+    }
+
+    .room-title {
+        font-size: 1.4rem;
+    }
+
+    .roomname-creator {
+        padding-top: 5px;
+    }
+
+    .leave-button {
+        margin-top: 0px;
+    }
+
+    .creator-info {
+        font-size: 0.7rem;
+    }
+
+    .header-center-content {
+        /* Gives more room to the central content */
+        max-width: calc(100% - 130px);
+    }
+
+    /* --- End Header adjustments --- */
+
+    /* Ensure full height and width takeover */
+    .full-screen-wrapper {
+        height: 100vh;
+        min-height: 100vh;
+    }
+
+    .main-chat-container {
+        width: 100%;
+        max-width: 100%;
+        /* Take full width on mobile */
+    }
+
+    /* Header and Input Sizes */
+    .chat-header h1 {
+        font-size: 1.5rem;
+        /* Larger Header */
+    }
+
+    .chat-input-base {
+        font-size: 1.1rem;
+        /* Larger input text */
+        padding: 0.9rem;
+        width: 80%;
+    }
+
+    /* Button Sizes and Padding */
+    .chat-button {
+        font-size: 1.1rem;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .delete-button {
+        font-size: 1.1rem;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .delete-popup {
+        width: 78% !important;
+    }
+
+    /* Message Bubble Text */
+    .message-bubble {
+        font-size: 1.1rem;
+        padding: 0.6rem 1.1rem;
+        max-width: 78%;
+    }
+
+    .message-sender {
+        font-size: 0.8rem;
+    }
+
+    /* MODAL Text Scaling */
+    .modal-content-card {
+        max-width: 20rem !important;
+    }
+
+    .modal-content-card h3 {
+        font-size: 1.5rem !important;
+    }
+
+    .modal-content-card p {
+        font-size: 1.1rem !important;
+    }
+}
+
+@media (max-width: 425px) {
+
+    /* Increase Base Font Size for mobile to scale everything up */
+    html,
+    body {
+        font-size: 16px;
+    }
+
+    /* --- Header adjustments for small screens --- */
+    .chat-header {
+        padding: 1.1rem 1rem;
+    }
+
+    .current-user-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .leave-room-btn-style {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    .leave-button {
+        margin-top: 10px;
+    }
+
+    .hamburger-button {
+        margin-top: 3px;
+    }
+
+    #room-name-display {
+        font-size: 1.3rem;
+    }
+
+    .roomname-creator {
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 10px;
+        padding-top: 10px;
+    }
+
+    .creator-info {
+        font-size: 0.85rem;
+    }
+
+    .header-center-content {
+        max-width: calc(100% - 120px);
+    }
+
+    /* --- End Header adjustments --- */
+
+
+    /* Ensure full height and width takeover */
+    .full-screen-wrapper {
+        height: 100vh;
+        min-height: 100vh;
+    }
+
+    .main-chat-container {
+        width: 100%;
+        max-width: 100%;
+        /* Take full width on mobile */
+    }
+
+    /* Header and Input Sizes */
+    .chat-header h1 {
+        font-size: 1.3rem;
+        /* Larger Header */
+    }
+
+    .chat-input-base {
+        font-size: 1.05rem;
+        /* Larger input text */
+        padding: 0.7rem;
+        width: 90%;
+    }
+
+    .delete-popup {
+        width: 75% !important;
+    }
+
+    /* Button Sizes and Padding */
+    .chat-button {
+        font-size: 1.05rem;
+        padding: 0.7rem 1.15rem;
+    }
+
+    .delete-button {
+        font-size: 1.05rem;
+        padding: 0.75rem 1.25rem;
+    }
+
+    /* Message Bubble Text */
+    .message-bubble {
+        font-size: 1.05rem;
+        padding: 0.6rem 1.1rem;
+        max-width: 70%;
+    }
+
+    .message-sender {
+        font-size: 0.75rem;
+    }
+
+    /* MODAL Text Scaling */
+    .modal-content-card h3 {
+        font-size: 1.4rem !important;
+    }
+
+    .modal-content-card p {
+        font-size: 1.05rem !important;
+    }
+}
+
+@media (max-width: 375px) {
+    .chat-input-base {
+        width: 88%;
+    }
+
+    .delete-popup {
+        width: 74% !important;
+    }
+
+    .modal-content-card {
+        max-width: 18rem !important;
+    }
+
+    /* --- Header adjustments for tiny screens --- */
+    .header-center-content {
+        /* Gives less room to central content, prioritizing buttons */
+        max-width: calc(100% - 100px);
+    }
+
+    .roomname-creator {
+        gap: 10px;
+        width: 240px;
+    }
+
+    .message-bubble {
+        max-width: 80%;
+    }
+
+}
+
+@media (max-width: 359px) {
+
+    /* Increase Base Font Size for mobile to scale everything up */
+    html,
+    body {
+        font-size: 16px;
+    }
+
+    .chat-log-box {
+        flex-grow: 1;
+    }
+
+    /* Header and Input Sizes */
+    .chat-header h1 {
+        font-size: 1.1rem;
+        /* Larger Header */
+    }
+
+    .chat-header {
+        padding: 1.2rem 1.05rem;
+    }
+
+    .chat-input-base {
+        font-size: 1.0rem;
+        /* Larger input text */
+        padding: 0.6rem;
+        width: 88.5%;
+    }
+
+    .delete-popup {
+        width: 72% !important;
+    }
+
+    /* Button Sizes and Padding */
+    .chat-button {
+        font-size: 1.0rem;
+        padding: 0.6rem 1.05rem;
+    }
+
+    .delete-button {
+        font-size: 1.0rem;
+        padding: 0.7rem 1.15rem;
+    }
+
+    /* Message Bubble Text */
+    .message-bubble {
+        font-size: 1.0rem;
+        padding: 0.3rem 1.0rem;
+        max-width: 80%;
+    }
+
+    .roomname-creator {
+        gap: 10px;
+        width: 175px;
+    }
+
+    .message-sender {
+        font-size: 0.7rem;
+    }
+
+    /* MODAL Text Scaling */
+    .modal-content-card {
+        max-width: 17rem !important;
+    }
+
+    .modal-content-card h3 {
+        font-size: 1.3rem !important;
+    }
+
+    .modal-content-card p {
+        font-size: 1.0rem !important;
+    }
+}
+
+/* ========================================================= */
+/* --- RELOAD SITE MODAL STYLES (Based on Generic Modal) --- */
+/* ========================================================= */
+.reload-modal-card h3 {
+    color: #F9FAFB;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.reload-modal-card p {
+    color: #E5E7EB;
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+/* Button group for modal actions */
+.modal-button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    /* Align buttons to the right */
+}
+
+/* Generic Modal Backdrop (used for both modals) */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(17, 24, 39, 0.75);
+    display: none;
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 300ms;
+}
+
+/* Generic Modal Content Card */
+.modal-content-card {
+    background-color: #1F2937;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    width: 100%;
+    max-width: 24rem;
+    padding: 1.5rem;
+    transform: scale(1);
+    transition: all 300ms;
+}
+
+/* ========================================================= */
+/* --- MOBILE DRAWER BEHAVIOR (Max width 500px) --- */
+/* ========================================================= */
+@media (max-width: 500px) {
+
+    /* Main container on mobile takes full width */
+    .main-chat-container {
+        max-width: 100%;
+    }
+
+    /* Show the hamburger button in the header */
+    .hamburger-button {
+        display: block;
+        order: 3;
+        /* Push to the right, next to the Leave button */
+    }
+
+    /* Mobile Drawer: Slides over the content */
+    .user-list-drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 150px;
+        border-left: none;
+        box-shadow: -4px 0 10px rgba(0, 0, 0, 0.4);
+        z-index: 40;
+        transform: translateX(100%);
+        transition: transform 0.3s ease-in-out;
+    }
+
+    /* VISIBLE state: Controlled by JavaScript when hamburger is clicked (CHANGED CLASS NAME) */
+    .user-list-drawer.is-open {
+        transform: translateX(0);
+    }
+
+    /* Show backdrop when drawer is open */
+    .drawer-backdrop {
+        position: absolute;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 39;
+    }
+}
+
+.request-accept-btn {
+    background-color: #10b981;
+    /* emerald-500 */
+    color: #ffffff;
+}
+
+.request-accept-btn:hover {
+    background-color: #059669;
+    /* emerald-600 */
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.request-deny-btn {
+    background-color: #ef4444;
+    /* red-500 */
+    color: #ffffff;
+}
+
+.request-deny-btn:hover {
+    background-color: #dc2626;
+    /* red-600 */
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.no-requests-message {
+    color: #64748b;
+    /* slate-500 */
+    font-style: italic;
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.request-accept-btn,
+.request-deny-btn {
+    width: 75px;
+    height: 35px;
+    border: none;
+    border-radius: 5px;
+    margin-left: 8px;
+}
+
+/* --- Requests Panel/Sidebar Styles --- */
+.chat-header-actions {
+    position: relative;
+}
+
+/* CSS for the bell icon when there are new requests */
+.request-toggle-btn i.fas.fa-bell.notification-active {
+    color: #DC2626 !important;
+    /* Bright Red */
+}
+
+/* Ensure the default color is white */
+.request-toggle-btn i.fas.fa-bell {
+    color: white;
+    transition: color 0.3s;
+    /* Smooth transition */
+}
+
+/* Badge Button */
+/* .request-toggle-btn {
+    background-color: #4F46E5;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+} */
+
+.request-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: rgba(79, 70, 229, 0.1);
+    color: white;
+    padding: 6px 12px;
+    border: 1px solid rgba(79, 70, 229, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.request-toggle-btn:hover {
+    background-color: rgba(79, 70, 229, 0.2);
+    border-color: #6366F1;
+    transform: translateY(-1px);
+}
+
+.btn-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The Notification Badge */
+.request-badge {
+    background-color: #F59E0B;
+    /* Amber-500 */
+    color: #111827;
+    /* Dark text for contrast */
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 18px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#request-count {
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+/* Sidebar/Panel container */
+.requests-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100vh;
+    background-color: #111827;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10000;
+    overflow-y: auto;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background-color: rgba(31, 41, 55, 0.5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.request-icon {
+    color: #FBBF24;
+    /* Amber accent */
+    font-size: 1.2rem;
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    color: #F3F4F6;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Close Button "X" */
+.close-sidebar-btn {
+    background: transparent;
+    border: none;
+    color: #9CA3AF;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-sidebar-btn:hover {
+    color: #EF4444;
+    /* Red on hover */
+    transform: rotate(90deg);
+}
+
+/* Hidden States */
+.requests-sidebar.hidden-panel {
+    transform: translateX(100%);
+    visibility: hidden;
+}
+
+.requests-sidebar:not(.hidden-panel) {
+    transform: translateX(0);
+    visibility: visible;
+}
+
+/* Container for dynamic content */
+#pending-requests-container {
+    padding: 10px;
+    flex-grow: 1;
+}
+
+
+/* Request Card Wrapper (adjust existing styles slightly) */
+#pending-requests-container .request-card-wrapper {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #4a6572;
+}
+
+#pending-requests-container .request-card-wrapper:last-child {
+    border-bottom: none;
+}
+
+/* Custom SweetAlert2 Mobile Styles */
+/* .mobile-alert-responsive-container {
+    
+} */
+
+.swal2-shown .lobby-container,
+.swal2-shown .main-chat-container {
+    display: none !important;
+}
+
+.swal2-actions {
+    max-width: 350px;
+    flex-wrap: wrap;
+
+}
+
+/* 🎯 MEDIA QUERY FOR MOBILE SIZES (360px to 450px) */
+@media (min-width: 359px) and (max-width: 450px) {
+
+    /* Target the main SweetAlert2 modal box */
+    .mobile-alert-responsive-container .swal2-popup {
+        width: 85% !important;
+        /* Make it wider to fill the screen better */
+    }
+
+    /* Target the title text */
+    .mobile-alert-responsive-container .swal2-title {
+        font-size: 1.1rem !important;
+    }
+
+    /* Target the main content text */
+    .mobile-alert-responsive-container .swal2-html-container {
+        font-size: 0.9rem !important;
+    }
+
+    /* Target the confirmation button */
+    .mobile-alert-responsive-container .swal2-confirm {
+        font-size: 0.95rem !important;
+        padding: 0.6em 1.2em !important;
+    }
+
+    .custom-alert-toast {
+        font-size: 15px;
+    }
+
+    .requests-sidebar {
+        width: 60%
+    }
+
+    .emoji-picker-container open {
+        max-width: 290px !important;
+    }
+}
+
+/* NEW: Emoji Picker Styling */
+.emoji-picker-container {
+    position: absolute;
+    bottom: 100%;
+    /* Position it right above the footer */
+    right: 100%;
+    left: 0;
+    z-index: 20;
+    /* Ensure it floats above other chat elements */
+    margin-bottom: 10px;
+    /* Small gap above the input */
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: translateY(10px);
+    opacity: 0;
+    pointer-events: none;
+    max-height: 400px;
+    /* Limit height */
+    max-width: 100%;
+    /* Ensure responsiveness */
+}
+
+.emoji-picker-container.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Style the custom element itself for better appearance */
+emoji-picker {
+    --emoji-size: 20px;
+    --emoji-picker-border-radius: 0.5rem;
+    --emoji-picker-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --background-color: #1F2937;
+    /* Dark background */
+    --category-icon-color: #9CA3AF;
+    --category-label-color: #F3F4F6;
+    --emoji-separator-border-color: #374151;
+    --input-background-color: #374151;
+    --input-color: #F3F4F6;
+    --search-icon-color: #9CA3AF;
+}
+
+.message-input-container {
+    position: relative;
+    /* Needed to anchor the emoji picker */
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+}
+
+/* Style the emoji toggle button */
+#emoji-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    color: #9CA3AF;
+    padding: 8px;
+    border: none;
+    border-radius: 12px;
+    /* Squircle looks more modern than a circle */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    outline: none;
+    margin-left: 0.3rem;
+}
+
+#emoji-toggle-btn:hover {
+    color: #ffffff;
+    background-color: rgba(156, 163, 175, 0.15);
+    transform: translateY(-1px);
+}
+
+#emoji-toggle-btn:active {
+    transform: scale(0.95);
+    background-color: rgba(156, 163, 175, 0.25);
+}
+
+/* Optional: Add a glow when the picker is open */
+#emoji-toggle-btn.active {
+    color: #fbbf24;
+    /* Golden yellow */
+    background-color: rgba(251, 191, 36, 0.1);
+}
+
+/* Ensure your chat links are distinguishable */
+.chat-link {
+    color: #3B82F6;
+    /* Tailwind blue-500 */
+    text-decoration: underline;
+    font-weight: 500;
+    word-break: break-all;
+    /* Important for long URLs */
+}
+
+/* Style for the YouTube embed container */
+
+.domain-title {
+    color: white;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+/* Link Colors */
+.text-link,
+.full-link {
+    color: white;
+    /* Default link color */
+    text-decoration: underline;
+    font-weight: 400;
+}
+
+.text-link:visited,
+.full-link:visited {
+    color: #c7d2fe;
+    /* Light Indigo/Lavender for visited links - distinctive from white */
+    /* OR a distinct gray: color: #9CA3AF; */
+}
+
+a:-webkit-any-link {
+    /* cursor: pointer; */
+    /* text-decoration: underline; */
+}

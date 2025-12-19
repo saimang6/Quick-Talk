@@ -1,0 +1,9 @@
+Django~=5.0
+uvicorn~=0.29.0
+channels~=4.0
+mysqlclient~=2.2.0
+channels-redis~=4.1
+websockets~=12.0
+Django
+daphne
+django-redis~=5.3 

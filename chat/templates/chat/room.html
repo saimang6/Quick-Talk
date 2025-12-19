@@ -1,0 +1,508 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chat Room</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js"></script>
+
+    <link rel="stylesheet" href="{% static 'css/room.css' %}">
+
+    <link rel="icon" href="https://placehold.co/16x16/000000/FFFFFF/png?text=C" type="image/png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+        integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <style>
+        /* NEW: Force text wrapping in message bubbles for long filenames/URLs */
+        .message-bubble p,
+        .message-bubble a,
+        .message-bubble span {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+            max-width: 100%;
+        }
+
+        /* Ensure the bubble itself doesn't get too wide on small screens */
+        .message-bubble {
+            max-width: 85%;
+        }
+
+        /* Mentions */
+        .mention {
+            color: #60A5FA;
+            /* Blue-400 */
+            font-weight: 600;
+        }
+
+        .mention-me {
+            background-color: rgba(245, 158, 11, 0.2);
+            /* Amber with opacity */
+            color: #FBBF24;
+            /* Amber-400 */
+            padding: 0 4px;
+            border-radius: 4px;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        /* NEW: Basic style to hide the content */
+        .hidden-chat-interface {
+            display: none !important;
+        }
+
+        /* UPDATED: Style for the request approval overlay */
+        .request-approval-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #111827;
+            /* Deep Charcoal Background */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 0px;
+            z-index: 10000;
+        }
+
+        .request-approval-overlay h1 {
+            color: #FBBF24;
+            /* Amber color for waiting/request */
+            margin-bottom: 1rem;
+        }
+
+        .request-approval-overlay p {
+            font-size: 1.1rem;
+            color: #9CA3AF;
+            padding: 0 18px;
+            line-height: 28px;
+        }
+
+        /* NEW: Style for request denial message */
+        .denial-message {
+            color: #EF4444;
+            /* Red color for denial */
+            margin-top: 1rem;
+            font-weight: bold;
+        }
+
+        @media (min-width: 360px) and (max-width: 450px) {
+            .request-approval-overlay {
+                padding: 0px;
+            }
+        }
+
+        /* NEW: Mention Suggestions Styles */
+        .mention-suggestions {
+            position: absolute;
+            bottom: 80px;
+            /* Fixed height from bottom since it's in footer now */
+            left: 20px;
+            /* Offset from side */
+            right: 20px;
+            /* Offset from side */
+            width: auto;
+            /* Auto width based on left/right */
+            max-width: 300px;
+            /* Limit width on desktop */
+            min-width: 200px;
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: #1F2937;
+            /* Dark gray */
+            border: 1px solid #374151;
+            border-radius: 8px;
+            box-shadow: 0 -4px 15px -3px rgba(0, 0, 0, 0.5);
+            /* Stronger shadow */
+            z-index: 10000;
+            /* Extremely high Z-index */
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 640px) {
+            .mention-suggestions {
+                width: auto;
+                max-width: none;
+                left: 10px;
+                right: 10px;
+                bottom: 70px;
+                /* Slightly lower on mobile to be near keyboard/input */
+            }
+        }
+
+        .mention-suggestions.hidden {
+            display: none !important;
+        }
+
+        .mention-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            color: #E5E7EB;
+            border-bottom: 1px solid #374151;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background-color 0.15s ease;
+        }
+
+        .mention-item:last-child {
+            border-bottom: none;
+        }
+
+        .mention-item:hover,
+        .mention-item.selected {
+            background-color: #374151;
+        }
+
+        .mention-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #4F46E5;
+            /* Indigo-600 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            color: white;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .mention-name {
+            font-weight: 500;
+        }
+
+        /* Ensure input group allows absolute positioning relative to it */
+        .input-group {
+            position: relative;
+        }
+
+        @media (max-width: 640px) {
+            .mention-suggestions {
+                width: 100%;
+                max-width: none;
+                left: 0;
+                right: 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="full-screen-wrapper">
+
+    <div class="main-chat-container {% if not is_owner %}hidden-chat-interface{% endif %}">
+
+        <header class="chat-header">
+            <div class="header-content-wrapper">
+                <div class="roomname-creator">
+                    <h1 id="room-name-display" class="room-title">Loading Room...</h1>
+
+                    <p id="creator-info" class="creator-info">
+                        Created by: <span id="creator-username-display">Connecting...</span>
+                    </p>
+                </div>
+
+                <div id="current-user-display" class="user-profile-display">
+
+                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24"
+                        class="user-icon">
+                        <circle cx="12" cy="12" r="12" fill="#ffffff" />
+                        <path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 21v-1a7 7 0 0 1 14 0v1H5z" fill="black"
+                            stroke="white" stroke-width="0.5" />
+                    </svg>
+
+                    <span id="current-username-span" class="current-username"></span>
+                </div>
+
+                {% if is_owner %}
+                <div class="chat-header-actions">
+                    <button id="request-display-toggle" class="request-toggle-btn" aria-label="View Join Requests">
+                        <div class="btn-content">
+                            <i class="fas fa-bell"></i>
+                            <span class="btn-text">Requests</span>
+                        </div>
+                        <span id="request-count" class="request-badge">0</span>
+                    </button>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <div class="hamburger-leave-container">
+                <button id="leave-room-btn" class="leave-button">Leave</button>
+
+                <button id="hamburger-menu-btn" class="hamburger-button" aria-label="Toggle user list">
+                    <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd"
+                            d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                            clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+            </div>
+
+        </header>
+
+        <!-- <div id="requests-panel" class="requests-sidebar hidden-panel">
+            <h3>Pending Join Requests</h3>
+            <div id="pending-requests-container">
+            </div>
+        </div> -->
+
+        <div id="requests-panel" class="requests-sidebar hidden-panel">
+            <div class="sidebar-header">
+                <div class="header-title-group">
+                    <i class="fas fa-user-plus request-icon"></i>
+                    <h3>Join Requests</h3>
+                </div>
+                <button id="close-requests-btn" class="close-sidebar-btn" aria-label="Close Panel">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="pending-requests-container">
+            </div>
+        </div>
+
+        <div class="chat-area-and-drawer-wrapper">
+
+            <div id="chat-log" class="chat-log-box hide-scrollbar">
+            </div>
+
+            <div id="user-list-drawer" class="user-list-drawer">
+                <h3 class="user-list-title">Participants (<span id="user-count">0</span>)</h3>
+                <ul id="user-list-container" class="user-list">
+                </ul>
+            </div>
+
+            <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
+        </div>
+
+        <footer class="chat-footer" style="position: relative;"> <!-- Ensure footer is relative context -->
+            <!-- NEW: Mention Suggestions Popup - moved to root of footer for z-index safety -->
+            <div id="mention-suggestions" class="mention-suggestions hidden">
+                <!-- Items will be injected dynamically -->
+            </div>
+
+            <div id="typing-indicator" class="typing-indicator-container hidden">
+            </div>
+
+            <div class="input-group">
+
+                <button id="delete-selected-btn" class="delete-button hidden">
+                    Delete Selected Messages
+                </button>
+
+                <!-- NEW: Reply Preview Bar (Moved here for stacking) -->
+                <div id="reply-preview-bar" class="reply-preview-bar hidden">
+                    <div class="reply-preview-content">
+                        <span class="reply-to-label">Replying to <b id="reply-to-sender"></b></span>
+                        <p id="reply-to-text" class="truncate-text"></p>
+                    </div>
+                    <button id="cancel-reply-btn" class="cancel-reply-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="message-input-container">
+
+                    <div id="emoji-picker-container" class="emoji-picker-container">
+                        <!-- The emoji picker component is a custom HTML tag -->
+                        <emoji-picker></emoji-picker>
+                    </div>
+
+                    <div class="emoji-input-container">
+                        <!-- NEW: Emoji Toggle Button -->
+                        <button id="emoji-toggle-btn" aria-label="Toggle Emoji Picker">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                            </svg>
+                        </button>
+
+                        <input id="chat-message-input" type="text" placeholder="Type your message..."
+                            class="chat-input-base message-input">
+
+                    </div>
+
+
+                    <!-- Attachment Button -->
+                    <button id="attachment-btn" aria-label="Attach File"
+                        style="color: #9CA3AF; background: none; border: none; cursor: pointer;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" width="22" height="22">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                    </button>
+                    <input type="file" id="file-input" style="display: none;">
+
+                    <!-- <input id="chat-message-submit" type="button" value="Send" class="chat-button send-button"> -->
+                    <button id="chat-message-submit" class="send-button" type="submit">
+                        <span>Send</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18"
+                            height="18">
+                            <path
+                                d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    {% if not is_owner %}
+    <!-- <div id="request-overlay" class="request-approval-overlay">
+        <h1>Request Access</h1>
+        <p id="overlay-status-message">Click the button below to send your join request to the room owner.</p>
+        <button id="send-join-request-btn"
+            style="margin-top: 1.5rem; padding: 0.75rem 1.5rem; background-color: #4F46E5; color: white; border-radius: 0.5rem; text-decoration: none; font-weight: bold; transition: background-color 0.2s;">
+            Send Join Request
+        </button>
+        <p id="denial-message-display" class="denial-message" style="display: none;">Access Denied. Redirecting to
+            lobby...</p>
+    </div> -->
+    <div id="request-overlay" class="request-approval-overlay">
+        <div class="request-card">
+            <div class="icon-pulse">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+                    stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <line x1="19" y1="8" x2="19" y2="14"></line>
+                    <line x1="22" y1="11" x2="16" y2="11"></line>
+                </svg>
+            </div>
+            <h1>Request Access</h1>
+            <p id="overlay-status-message">This room is private. Send a request to the owner to join the conversation.
+            </p>
+
+            <button id="send-join-request-btn" class="hero-request-btn">
+                <span>Send Join Request</span>
+                <i class="fas fa-paper-plane"></i>
+            </button>
+
+            <p id="denial-message-display" class="denial-message" style="display: none;">
+                Access Denied. Redirecting to lobby...
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    {{ room_slug|json_script:"room-slug" }}
+    {{ username|json_script:"user-name" }}
+    {{ is_owner|json_script:"is-owner" }}
+    {{ creator_username|json_script:"creator-username" }}
+
+    <div id="delete-modal" class="modal-backdrop">
+        <div class="delete-popup" style="max-width: 25rem;">
+
+            <h3 id="modal-title" style="font-size: 1.125rem; line-height: 1.75rem; font-weight: 700; color: white;">
+                Confirm Deletion
+            </h3>
+            <div style="margin-top: 0.5rem;">
+                <p id="modal-body-text" style="font-size: 0.875rem; color: #9CA3AF;">
+                    You have selected <span id="message-count" style="font-weight: 600; color: #EF4444;"></span>
+                    message(s).
+                    Choose how you want to delete them.
+                </p>
+            </div>
+
+            <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <button id="delete-for-all-btn"
+                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); padding: 0.75rem 1rem; background-color: #DC2626; font-size: 1rem; font-weight: 500; color: white; cursor: pointer;">
+                    Delete for Everyone
+                </button>
+                <button id="delete-for-me-btn"
+                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; border: 1px solid #4B5563; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); padding: 0.75rem 1rem; background-color: #374151; font-size: 1rem; font-weight: 500; color: white; cursor: pointer;">
+                    Delete for Me Only
+                </button>
+            </div>
+            <div style="margin-top: 0.75rem;">
+                <button id="delete-cancel-btn"
+                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #9CA3AF; cursor: pointer;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="leave-modal" class="modal-backdrop">
+        <div class="modal-content-card">
+
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: white;">
+                Confirm Exit
+            </h3>
+            <div style="margin-top: 0.5rem;">
+                <p style="font-size: 1rem; color: #9CA3AF;">
+                    Are you sure you want to leave the chat room? You won't be able to review messages when rejoin...
+                </p>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-start;">
+                <button id="leave-cancel-btn"
+                    style="padding: 0.75rem 1.5rem; background-color: #374151; color: white; border: 1px solid #4B5563; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
+                    Cancel
+                </button>
+                <button id="leave-confirm-btn"
+                    style="padding: 0.75rem 1.5rem; background-color: #EF4444; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
+                    Leave Room
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="connection-lost-modal" class="modal-backdrop">
+        <div class="modal-content-card reload-modal-card">
+
+            <h3 id="connection-modal-title">
+                Connection Lost
+            </h3>
+            <div>
+                <p id="connection-modal-body">
+                    We failed to re-establish a connection after multiple attempts. Please check your internet
+                    connection and try manually refreshing the page.
+                </p>
+            </div>
+
+            <div class="modal-button-group">
+                <button id="connection-dismiss-btn" class="chat-button send-button">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modular JS Files -->
+    <script src="{% static 'js/room_config.js' %}"></script>
+    <script src="{% static 'js/room_utils.js' %}"></script>
+    <script src="{% static 'js/room_ui.js' %}"></script>
+    <script src="{% static 'js/room_socket.js' %}"></script>
+    <script src="{% static 'js/room_main.js' %}"></script>
+</body>
+
+</html>

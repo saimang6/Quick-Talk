@@ -1,0 +1,349 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Quick Talk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* Base Styling */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #111827;
+            color: white;
+        }
+
+        .welcome-container {
+            background-color: #1F2937;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 1rem;
+            border: 1px solid #4B5563;
+            border-radius: 0.5rem;
+            background-color: #374151;
+            color: white;
+            font-size: 1rem;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4F46E5;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #4338CA;
+        }
+
+        label {
+            display: block;
+            text-align: left;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        /* ... Your Media Queries ... */
+        @media (min-width: 376px) and (max-width: 425px) {
+            .welcome-container {
+                max-width: 290px;
+            }
+
+            label {
+                text-align: center;
+            }
+
+        }
+
+        @media (min-width: 330px) and (max-width: 375px) {
+            .welcome-container {
+                max-width: 260px;
+            }
+
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            label {
+                font-size: 1.2rem;
+                margin-bottom: 1.5rem;
+                text-align: center;
+            }
+
+            input[type="text"] {
+                font-size: 1.2rem;
+                padding: 12px;
+                width: calc(95% - 20px);
+            }
+
+            button {
+                padding: 12px;
+                font-size: 1.2rem;
+            }
+
+        }
+
+        /* Custom SweetAlert2 Mobile Styles */
+        /* .mobile-alert-responsive-container {
+
+        } */
+
+        .swal2-shown .welcome-container {
+            display: none !important;
+        }
+
+
+        /* 🎯 MEDIA QUERY FOR MOBILE SIZES (360px to 450px) */
+        @media (min-width: 360px) and (max-width: 450px) {
+
+            /* Target the main SweetAlert2 modal box */
+            .mobile-alert-responsive-container .swal2-popup {
+                width: 85% !important;
+                /* Make it wider to fill the screen better */
+            }
+
+            /* Target the title text */
+            .mobile-alert-responsive-container .swal2-title {
+                font-size: 1.1rem !important;
+            }
+
+            /* Target the main content text */
+            .mobile-alert-responsive-container .swal2-html-container {
+                font-size: 0.9rem !important;
+            }
+
+            /* Target the confirmation button */
+            .mobile-alert-responsive-container .swal2-confirm {
+                font-size: 0.95rem !important;
+                padding: 0.6em 1.2em !important;
+            }
+
+
+        }
+
+        /* Info Button & Modal */
+        .info-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #4F46E5;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .info-button:hover {
+            transform: scale(1.1);
+            background-color: #4338CA;
+        }
+
+        .info-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .info-content {
+            background-color: #1F2937;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 400px;
+            width: 90%;
+            color: white;
+            position: relative;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #9CA3AF;
+        }
+
+        .close-btn:hover {
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-img {
+            display: block;
+            margin: 0 auto 1.5rem auto;
+            max-width: 140px;
+            height: auto;
+            border-radius: 10px;
+        }
+    </style>
+    <style>
+        /* 🎯 MEDIA QUERY FOR MOBILE SIZES - Info Modal Fix */
+        @media (min-width: 360px) and (max-width: 450px) {
+            .info-content {
+                max-width: 290px;
+                /* Optional: Adjust padding for smaller screens if needed */
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="welcome-container">
+        <img src="{% static 'logo.png' %}" alt="Quick Talk Logo" class="logo-img">
+        <h1>Welcome to Quick Talk!</h1>
+        <form id="name-form" action="{% url 'lobby' %}" method="get">
+            <label for="username-input">Enter Your Name (Emojis welcome!):</label>
+            <input id="username-input" type="text" name="username" required placeholder="e.g., Jane 🚀">
+
+            <button type="submit">Go to Lobby</button>
+        </form>
+    </div>
+
+    <!-- Info Button -->
+    <div id="info-btn" class="info-button" title="About Quick Talk">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2" style="width: 24px; height: 24px;">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="info-modal">
+        <div class="info-content">
+            <span class="close-btn">&times;</span>
+            <img src="{% static 'logo.png' %}" alt="Quick Talk Logo" class="logo-img">
+            <h2>About Quick Talk</h2>
+            <p style="margin-top: 10px; line-height: 1.5; color: #D1D5DB;">
+                Quick Talk is a fast, secure, and simple way to connect with friends.
+                Enter a lobby, join a room, and start chatting instantly!
+            </p>
+            <p style="margin-top: 15px; font-size: 0.8rem; color: #9CA3AF;">Version 1.0.0</p>
+        </div>
+    </div>
+
+    <script>
+        // 1. Push a new (dummy) state when the page loads. This prevents the user
+        // from going back to any previous external site immediately.
+        history.pushState(null, null, location.href);
+
+        // 2. When the user clicks the browser's "Back" button, the 'popstate' event fires.
+        window.onpopstate = function () {
+            // We immediately force the browser one step forward, effectively trapping the user.
+            history.go(1);
+
+            // Show the custom alert
+            Swal.fire({
+                title: 'Cannot Go Back',
+                text: "Please enter your name and click 'Go to Lobby' to proceed.",
+                icon: 'info',
+                customClass: {
+                    container: 'mobile-alert-responsive-container'
+                },
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#4F46E5' // Matching your button color
+            });
+
+            console.log("Back button click detected and SweetAlert displayed.");
+        };
+        // ==========================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const usernameInput = document.getElementById('username-input');
+
+            // --- CRITICAL STEP 1: CLEAR SESSION DATA ON INDEX LOAD ---
+            // This ensures a clean slate when a user lands on the entry page.
+            sessionStorage.removeItem('chatUsername');
+
+            usernameInput.focus();
+
+            // 2. Save logic for form submission
+            document.getElementById('name-form').addEventListener('submit', function () {
+                // Save the username to session storage before navigating to the lobby
+                sessionStorage.setItem('chatUsername', usernameInput.value.trim());
+            });
+
+            // Info Modal Logic
+            const infoBtn = document.getElementById('info-btn');
+            const infoModal = document.getElementById('info-modal');
+            const closeBtn = document.querySelector('.close-btn');
+
+            if (infoBtn && infoModal && closeBtn) {
+                infoBtn.addEventListener('click', () => {
+                    infoModal.style.display = 'flex';
+                });
+
+                closeBtn.addEventListener('click', () => {
+                    infoModal.style.display = 'none';
+                });
+
+                window.addEventListener('click', (e) => {
+                    if (e.target === infoModal) {
+                        infoModal.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

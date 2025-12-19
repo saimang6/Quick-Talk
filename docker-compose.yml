@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 1. Django Web App Service
+  redis:
+    image: redis:6-alpine
+    container_name: django-chat-app-redis-1
+    ports:
+      - "6379:6379"
+    healthcheck: # <--- NEW SECTION
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+  web:
+    build: .
+    # We will temporarily use this command. We'll update it for Channels later.
+    # command: uvicorn ChatProject.asgi:application --host 0.0.0.0 --port 8000
+    # command: daphne ChatProject.asgi:application -b 0.0.0.0 -p 8000
+    command: daphne -b 0.0.0.0 -p 8000 ChatProject.asgi:application
+    volumes:
+      - .:/usr/src/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_started # <-- CRITICAL FIX: Changed to service_started
+      redis:
+        condition: service_healthy
+    environment:
+      # Database connection settings (used in Django settings.py)
+      DB_HOST: db
+      DB_NAME: myappdb
+      DB_USER: user
+      DB_PASSWORD: password123
+
+      # FIX: THIS IS THE MISSING VARIABLE
+      DJANGO_SETTINGS_MODULE: ChatProject.settings
+    
+  # 2. MySQL Database Service
+  db:
+    image: mysql:8.0
+    ports: # <--- ADDED: Expose port 3306 to the host machine
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql # Persistent storage for data
+    environment:
+      MYSQL_DATABASE: myappdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password123
+      MYSQL_ROOT_PASSWORD: rootpassword
+    restart: always
+    
+volumes:
+  mysql_data:
