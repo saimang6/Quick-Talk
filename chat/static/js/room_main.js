@@ -122,15 +122,12 @@ document.addEventListener('visibilitychange', () => {
         if (chatSocket) {
             console.log("Visibility change detected. Forcing socket refresh...");
 
-            // Reset backoff counter to force near-instant reconnect (~125ms)
-            // We use a negative value so Math.pow(2, n) is small, and we get extra attempts.
-            reconnectAttempts = -3;
+            // We reset to 0 to ensure the NEXT connection starts its backoff from the beginning.
+            reconnectAttempts = 0;
 
             if (chatSocket.readyState === WebSocket.OPEN || chatSocket.readyState === WebSocket.CONNECTING) {
-                // Close existing socket -> triggers onclose -> reconnectWebSocket
                 chatSocket.close();
             } else {
-                // If already closed, connect immediately
                 connectWebSocket();
             }
         } else {

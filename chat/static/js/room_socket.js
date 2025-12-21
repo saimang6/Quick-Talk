@@ -45,7 +45,7 @@ function connectWebSocket() {
 
     chatSocket.onopen = handleSocketOpen;
     chatSocket.onmessage = handleSocketMessage;
-    chatSocket.onclose = handleSocketClose;
+    chatSocket.onclose = handleSocketCloseDebug;
     chatSocket.onerror = handleSocketError;
 }
 
@@ -138,6 +138,11 @@ function handleSocketClose(e) {
 
 function handleSocketError(e) {
     console.error('WebSocket error:', e);
+}
+
+function handleSocketCloseDebug(e) {
+    console.log(`WebSocket closed: Code ${e.code}, Reason: ${e.reason}`);
+    handleSocketClose(e);
 }
 
 function reconnectWebSocket() {
@@ -297,6 +302,7 @@ function sendReaction(messageId, emoji) {
 
 function handleSocketMessage(e) {
     const data = JSON.parse(e.data);
+    console.log("WebSocket Message Received:", data.type);
 
     switch (data.type) {
 

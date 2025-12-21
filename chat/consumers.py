@@ -175,10 +175,12 @@ class ChatConsumer(WebsocketConsumer):
             # ACTIVE/OWNER LOGIC
             
             # 1. Add user's channel to the main Channel Layer Group
+            print(f"Adding user {self.username} to group {self.room_group_name}...")
             async_to_sync(self.channel_layer.group_add)(
                 self.room_group_name,
                 self.channel_name
             )
+            print(f"User {self.username} successfully added to group.")
 
             # 2. Add user to the ROOM_USERS list (for participant display)
             user_joined = self.username not in self.ROOM_USERS.get(self.room_slug, {}) 

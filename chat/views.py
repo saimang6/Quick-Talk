@@ -16,9 +16,9 @@ def lobby(request):
     # The username must be passed from the welcome page
     username = request.GET.get('username')
     
-    if username:
+    if not username:
         # If no username is set, redirect back to the welcome page
-        return redirect(reverse('lobby'))
+        return redirect(reverse('index'))
         
     rooms = Room.objects.all() # Get all rooms from the database
     
