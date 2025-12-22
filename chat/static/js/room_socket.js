@@ -4,6 +4,214 @@
 
 const debouncedSendTypingStop = debounce(sendTypingStop, 1500);
 
+// Default STUN-only config (fallback)
+let iceConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
+    ],
+    iceCandidatePoolSize: 10
+};
+
+/**
+ * Fetches fresh TURN server credentials from Metered.ca API.
+ * This ensures credentials are always valid for cross-network calls.
+ * @returns {Promise<Object>} ICE configuration with TURN servers
+ */
+async function fetchTurnCredentials() {
+    try {
+        // Metered.ca TURN server API - using quicktalk app
+        const response = await fetch("https://quicktalk.metered.live/api/v1/turn/credentials?apiKey=f5f8750f2bb6f9b2c77af9c980b8f0688ab6");
+
+        if (!response.ok) {
+            throw new Error(`TURN API returned ${response.status}`);
+        }
+
+        const iceServers = await response.json();
+        console.log("Fetched fresh TURN credentials:", iceServers.length, "servers");
+
+        return {
+            iceServers: iceServers,
+            iceCandidatePoolSize: 10
+        };
+    } catch (err) {
+        console.warn("Failed to fetch TURN credentials, using hardcoded TURN fallback:", err.message);
+
+        // Hardcoded fallback with multiple TURN options
+        return {
+            iceServers: [
+                // STUN servers
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                // OpenRelay TURN servers (static credentials)
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ],
+            iceCandidatePoolSize: 10
+        };
+    }
+}
+
+let peerConnection = null;
+let localStream = null; // Track local audio stream for cleanup
+let iceCandidateQueue = []; // Queue for ICE candidates that arrive before remote description
+
+
+/**
+ * Cleans up WebRTC resources (peer connection, audio elements, streams)
+ */
+function cleanupWebRTC() {
+    console.log("Cleaning up WebRTC resources...");
+
+    // 1. Stop all local audio tracks
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            console.log("Stopped local track:", track.kind);
+        });
+        localStream = null;
+    }
+
+    // 2. Close existing peer connection
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    // 3. Clear ICE candidate queue
+    iceCandidateQueue = [];
+
+
+    // 3. Remove and clear the remote audio element
+    const remoteAudio = document.getElementById('remote-voip-audio');
+    if (remoteAudio) {
+        remoteAudio.pause();
+        remoteAudio.srcObject = null;
+        remoteAudio.remove();
+    }
+}
+
+async function createPeerConnection() {
+    console.log("Initializing new RTCPeerConnection...");
+
+    // CRITICAL: Clean up any existing connection first
+    cleanupWebRTC();
+
+    // Fetch fresh TURN credentials for cross-network support
+    const freshConfig = await fetchTurnCredentials();
+    console.log("Using ICE config with", freshConfig.iceServers.length, "servers");
+
+    peerConnection = new RTCPeerConnection(freshConfig);
+
+    // --- DEBUG: Monitor ICE connection state ---
+    peerConnection.oniceconnectionstatechange = () => {
+        if (!peerConnection) return; // Guard against null after cleanup
+        const state = peerConnection.iceConnectionState;
+        console.log("ICE Connection State:", state);
+
+        if (state === 'connected' || state === 'completed') {
+            displayMessage('System', '✅ Voice call connected!', 'voip-connected-' + Date.now());
+        } else if (state === 'failed') {
+            displayMessage('System', '❌ Voice call failed. Attempting to restart...', 'voip-failed-' + Date.now());
+            // Try ICE restart
+            if (peerConnection && peerConnection.restartIce) {
+                console.log("Attempting ICE restart...");
+                peerConnection.restartIce();
+            }
+        } else if (state === 'disconnected') {
+            displayMessage('System', '⚠️ Voice call disconnected. Waiting for reconnection...', 'voip-disconnected-' + Date.now());
+            // Wait a bit and check if it recovers, otherwise attempt restart
+            setTimeout(() => {
+                if (peerConnection && peerConnection.iceConnectionState === 'disconnected') {
+                    console.log("Still disconnected after timeout, attempting ICE restart...");
+                    if (peerConnection.restartIce) {
+                        peerConnection.restartIce();
+                    }
+                }
+            }, 3000);
+        } else if (state === 'checking') {
+            console.log("ICE checking - negotiating connection...");
+        }
+    };
+
+
+    // --- DEBUG: Monitor ICE gathering state ---
+    peerConnection.onicegatheringstatechange = () => {
+        if (!peerConnection) return;
+        console.log("ICE Gathering State:", peerConnection.iceGatheringState);
+    };
+
+    // 1. Listen for ICE candidates
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            console.log("Sending ICE Candidate:", event.candidate.type, event.candidate.protocol);
+            chatSocket.send(JSON.stringify({
+                'type': 'webrtc_signal',
+                'data': { 'ice': event.candidate },
+                'target_user': 'all'
+            }));
+        }
+    };
+
+    // 2. Listen for the remote audio stream
+    peerConnection.ontrack = (event) => {
+        console.log("Incoming audio stream detected!", event.streams);
+
+        // Remove any existing audio element first
+        let remoteAudio = document.getElementById('remote-voip-audio');
+        if (remoteAudio) {
+            remoteAudio.pause();
+            remoteAudio.srcObject = null;
+            remoteAudio.remove();
+        }
+
+        // Create a fresh audio element
+        remoteAudio = document.createElement('audio');
+        remoteAudio.id = 'remote-voip-audio';
+        document.body.appendChild(remoteAudio);
+
+        // Set attributes for mobile compatibility
+        remoteAudio.setAttribute('autoplay', 'true');
+        remoteAudio.setAttribute('playsinline', 'true');
+        remoteAudio.volume = 1.0; // Max volume
+        remoteAudio.srcObject = event.streams[0];
+
+        // CRITICAL: Manually trigger play to bypass browser silence policies
+        remoteAudio.play().then(() => {
+            console.log("Remote audio playing successfully!");
+        }).catch(e => {
+            console.warn("Autoplay blocked. User must click the page to hear audio.", e);
+            displayMessage('System', '🔊 Click anywhere to enable call audio.', Date.now());
+
+            // Add a one-time click listener to resume audio
+            document.addEventListener('click', function resumeAudio() {
+                remoteAudio.play();
+                document.removeEventListener('click', resumeAudio);
+            }, { once: true });
+        });
+
+        displayMessage('System', '🎙️ Voice call active.', Date.now());
+    };
+}
+
+
+
 function connectWebSocket() {
     if (isFatalError) {
         console.log("Fatal error detected (Secret Check/Access Denial). Halting WebSocket connection attempt.");
@@ -482,7 +690,134 @@ function handleSocketMessage(e) {
             }
             break;
 
+        case 'webrtc_signal':
+            // 1. IGNORE signals sent by yourself
+            if (data.sender === fixedUsername) {
+                console.log("WebRTC: Ignoring self-signal.");
+                break;
+            }
+
+            console.log("WebRTC Signal Received from:", data.sender);
+
+            if (data.data.type === 'offer') {
+                handleIncomingCall(data.data, data.sender);
+            }
+            else if (data.data.type === 'answer') {
+                // Set remote description if we are waiting for an answer
+                if (peerConnection && peerConnection.signalingState === "have-local-offer") {
+                    peerConnection.setRemoteDescription(new RTCSessionDescription(data.data))
+                        .then(() => {
+                            console.log("Remote description set (answer). Processing queued ICE candidates...");
+
+                            // Process any queued ICE candidates
+                            const processQueue = () => {
+                                if (iceCandidateQueue.length > 0) {
+                                    const candidate = iceCandidateQueue.shift();
+                                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+                                        .then(() => {
+                                            console.log("Added queued ICE candidate");
+                                            processQueue(); // Process next
+                                        })
+                                        .catch(err => {
+                                            console.error("Error adding queued ICE candidate:", err);
+                                            processQueue(); // Continue even on error
+                                        });
+                                }
+                            };
+                            processQueue();
+                        })
+                        .catch(err => console.error("Error setting remote answer:", err));
+                }
+            }
+            else if (data.data.ice) {
+                // If we have peer connection AND remote description, add ICE immediately
+                // Otherwise, queue it for later (even if peerConnection is null!)
+                if (peerConnection && peerConnection.remoteDescription) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(data.data.ice))
+                        .then(() => console.log("Added ICE candidate successfully"))
+                        .catch(err => console.error("Error adding ICE candidate:", err));
+                } else {
+                    // CRITICAL FIX: Queue even when peerConnection is null (still being created)
+                    console.log("Queueing ICE candidate (peer connection or remote description not ready)");
+                    iceCandidateQueue.push(data.data.ice);
+                }
+            }
+
+            break;
+
+
         default:
             console.warn('Unknown message type received:', data.type);
     }
 }
+
+// --- VoIP / WebRTC FUNCTIONS ---
+
+// Function to handle an incoming call (The "Answer" logic)
+async function handleIncomingCall(offer, sender) {
+    try {
+        console.log("=== INCOMING CALL ===");
+        console.log("Handling incoming call from:", sender);
+
+        // Show notification that we're receiving a call
+        displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+
+        // Initialize the connection object first (this also cleans up old connections)
+        console.log("Step 1: Creating peer connection...");
+        await createPeerConnection();
+        console.log("Step 1: Peer connection created successfully");
+
+        // Get microphone access and store in global for cleanup
+        console.log("Step 2: Requesting microphone access...");
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Step 2: Microphone access granted, tracks:", localStream.getTracks().length);
+
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+            console.log("Step 2: Added track to peer connection:", track.kind, track.readyState);
+        });
+
+        console.log("Step 3: Setting remote description (offer)...");
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log("Step 3: Remote description set successfully");
+
+        // CRITICAL: Process any ICE candidates that were queued while we were setting up
+        console.log("Step 3.5: Processing", iceCandidateQueue.length, "queued ICE candidates...");
+        while (iceCandidateQueue.length > 0) {
+            const candidate = iceCandidateQueue.shift();
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log("Added queued ICE candidate");
+            } catch (err) {
+                console.error("Error adding queued ICE candidate:", err);
+            }
+        }
+
+        console.log("Step 4: Creating answer...");
+        const answer = await peerConnection.createAnswer();
+        console.log("Step 4: Answer created, type:", answer.type);
+
+        console.log("Step 5: Setting local description (answer)...");
+        await peerConnection.setLocalDescription(answer);
+        console.log("Step 5: Local description set successfully");
+
+        console.log("Step 6: Sending answer to", sender);
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': answer,
+            'target_user': sender
+        }));
+
+        console.log("=== CALL ANSWER SENT SUCCESSFULLY ===");
+        displayMessage('System', '📱 Answering call...', 'voip-answering-' + Date.now());
+
+    } catch (err) {
+        console.error("=== INCOMING CALL FAILED ===");
+        console.error("Failed to handle incoming call:", err);
+        console.error("Error name:", err.name);
+        console.error("Error message:", err.message);
+        displayMessage('System', '❌ Failed to answer call: ' + err.message, 'voip-error-' + Date.now());
+    }
+}
+
+

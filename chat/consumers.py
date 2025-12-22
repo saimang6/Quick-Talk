@@ -415,7 +415,6 @@ class ChatConsumer(WebsocketConsumer):
         if messages_to_send:
             self.send(text_data=json.dumps({
                 'type': 'catch_up_messages',
-                'type': 'catch_up_messages',
                 'messages': messages_to_send
             }))
 
@@ -592,7 +591,6 @@ class ChatConsumer(WebsocketConsumer):
             # 4. Update the request count panel for the owner
                 self.broadcast_request_count_to_owner() 
 
-        
         # --- HANDLER: STANDARD MESSAGE (ACTIVE USER ONLY) ---
         elif message_type == 'message':
             # IMPORTANT: Prevent pending users from sending messages
@@ -705,10 +703,8 @@ class ChatConsumer(WebsocketConsumer):
              )
 
         elif message_type == 'delete_for_me':
-             message_ids = text_data_json['message_ids']
-        elif message_type == 'delete_for_me':
-             message_ids = text_data_json['message_ids']
-             self.delete_for_me_confirmed({ 'message_id': message_ids })
+            message_ids = text_data_json['message_ids']
+            self.delete_for_me_confirmed({ 'message_id': message_ids })
 
         # --- NEW HANDLER: ADD REACTION ---
         elif message_type == 'add_reaction':
@@ -749,6 +745,46 @@ class ChatConsumer(WebsocketConsumer):
                     'reactions': reactions_data
                 }
             )
+        
+        #Webrtc
+        elif message_type == 'webrtc_signal':
+            # target_user = text_data_json.get('target_user')
+            
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'webrtc_signal_handler', # Matches the function name below
+                    'data': text_data_json.get('data'),
+                    'sender': self.username
+                }
+            )
+    
+
+    def webrtc_signal_handler(self, event):
+        """
+        Sends signaling data (offers, answers, ICE) to the client.
+        Crucial: It filters out the sender so they don't receive their own signal.
+        """
+        # Skip if the message is coming back to the person who sent it
+        if self.username == event['sender']:
+            return
+
+        # Send signal to the client
+        self.send(text_data=json.dumps({
+            'type': 'webrtc_signal',
+            'data': event['data'],
+            'sender': event['sender']
+        }))
+
+
+    # def webrtc_signal_handler(self, event):
+    #     # Only send to the browser if they are the intended recipient
+    #     if self.username == event['target_user'] or event['target_user'] == 'all':
+    #         self.send(text_data=json.dumps({
+    #             'type': 'webrtc_signal',
+    #             'data': event['data'],
+    #             'sender': event['sender']
+    #         }))
 
 
     # ------------------------------------------------------------------

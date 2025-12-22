@@ -93,6 +93,46 @@ try {
 }
 
 // --- INITIALIZATION AND EVENT LISTENERS ---
+const voipCallBtn = document.getElementById('voip-call-btn');
+if (voipCallBtn) {
+    voipCallBtn.addEventListener('click', async () => {
+        // CRITICAL FIX FOR MOBILE: Request microphone access FIRST, in the direct user gesture context.
+        // Mobile browsers require getUserMedia to be called directly from a user gesture, 
+        // not from within a Promise callback (like SweetAlert's .then()).
+
+        try {
+            // Pre-request microphone access while still in gesture context
+            console.log("Requesting microphone access (for gesture context)...");
+            const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Immediately stop the test stream - we'll get a new one in startVoiceCall
+            testStream.getTracks().forEach(track => track.stop());
+            console.log("Microphone access granted!");
+
+            // Now show confirmation (user already granted mic access)
+            const result = await Swal.fire({
+                title: 'Start Voice Call?',
+                text: "This will broadcast a call invitation to everyone in the room.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Call Now'
+            });
+
+            if (result.isConfirmed) {
+                startVoiceCall();
+            }
+        } catch (err) {
+            console.error("Microphone access denied:", err);
+            Swal.fire({
+                title: 'Microphone Required',
+                text: 'Please allow microphone access to use voice calls.',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+}
+
+
 window.addEventListener('pageshow', (event) => {
     // Check for BFcache restore AND confirm we are the owner
     // We only care about the owner here, as their exit is the critical path.
@@ -117,6 +157,13 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         console.log("App returned to foreground.");
 
+        // CRITICAL: Skip aggressive reconnect if a voice call is active
+        // Closing the WebSocket during a call can disrupt the WebRTC connection
+        if (peerConnection && peerConnection.connectionState !== 'closed') {
+            console.log("Voice call active - skipping socket refresh to preserve call.");
+            return;
+        }
+
         // Aggressively refresh connection to ensure immediate message sync.
         // This handles "zombie" connections that appear OPEN but are dead/stale due to backgrounding.
         if (chatSocket) {
@@ -135,6 +182,7 @@ document.addEventListener('visibilitychange', () => {
         }
     }
 });
+
 
 // Mobile Swipe Back Trap
 const initialHistoryState = { roomActive: true };
@@ -173,9 +221,6 @@ window.addEventListener('popstate', function (event) {
         });
     }
 });
-
-
-
 
 // 2. CONNECT WEBSOCKET (only runs if checkOwnerSecretOnLoad did not halt)
 document.addEventListener('DOMContentLoaded', () => {
@@ -252,7 +297,6 @@ if (messageInputDom) {
         }
     });
 
-    // Input event for typing indicator AND mentions
     // Input event for typing indicator AND mentions
     // We add 'keyup' as a fallback because some mobile keyboards don't fire 'input' reliably
     const handleInputOrKeyup = function (e) {
@@ -361,4 +405,35 @@ if (messageInputDom) {
             pickerOpen = false;
         }
     });
+}
+
+async function startVoiceCall() {
+    console.log("Starting WebRTC Call...");
+    try {
+        // Initialize the connection object first (this also cleans up old connections)
+        // Must await since createPeerConnection is now async (fetches TURN credentials)
+        await createPeerConnection();
+
+        // Get microphone access and store in global for cleanup
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Ensure tracks are added BEFORE createOffer
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': offer,
+            'target_user': 'all'
+        }));
+
+        console.log("Call offer sent successfully!");
+    } catch (err) {
+        console.error("Could not start voice call:", err);
+        Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');
+    }
 }
