@@ -1,2 +1,2 @@
 # Quick-Talk
-Quick Talk is a fast, secure, and simple way to connect with friends. Enter a lobby, join a room, and start chatting instantly!
+Quick Talk is a fast, secure, and simple way to connect. Join a room to chat instantly with friends, or start a voice call with just one click!

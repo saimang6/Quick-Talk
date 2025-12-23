@@ -201,7 +201,31 @@ function hideCallInterface() {
     const overlay = document.getElementById('call-interface-overlay');
     if (overlay) {
         overlay.classList.add('hidden');
+        overlay.classList.remove('minimized'); // Reset state
+        const miniBtn = document.getElementById('minimize-call-btn');
+        if (miniBtn) miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
         stopCallTimer();
+    }
+}
+
+function toggleMinimizeCall() {
+    const overlay = document.getElementById('call-interface-overlay');
+    const miniBtn = document.getElementById('minimize-call-btn');
+
+    if (overlay) {
+        const isMinimized = overlay.classList.toggle('minimized');
+
+        if (miniBtn) {
+            if (isMinimized) {
+                miniBtn.innerHTML = '<i class="fas fa-expand-alt"></i>';
+                miniBtn.title = "Expand Call Overlay";
+            } else {
+                miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
+                miniBtn.title = "Minimize Call Overlay";
+            }
+        }
+
+        console.log("Call interface " + (isMinimized ? "minimized" : "expanded"));
     }
 }
 
@@ -237,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hangupBtn = document.getElementById('hangup-call-btn');
     const muteBtn = document.getElementById('mute-call-btn');
     const speakerBtn = document.getElementById('speaker-call-btn');
+    const minimizeBtn = document.getElementById('minimize-call-btn');
 
     if (hangupBtn) {
         hangupBtn.addEventListener('click', () => {
@@ -252,6 +277,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (speakerBtn) {
         speakerBtn.addEventListener('click', toggleSpeaker);
+    }
+
+    if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMinimizeCall();
+        });
+    }
+
+    // Expand when clicking the minimized pill (but not its buttons)
+    const callOverlay = document.getElementById('call-interface-overlay');
+    if (callOverlay) {
+        callOverlay.addEventListener('click', (e) => {
+            if (callOverlay.classList.contains('minimized')) {
+                // If the click target is NOT a button or inside a button
+                if (!e.target.closest('.call-btn') && !e.target.closest('.minimize-call-btn')) {
+                    toggleMinimizeCall();
+                }
+            }
+        });
     }
 });
 

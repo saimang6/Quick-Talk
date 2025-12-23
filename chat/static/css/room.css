@@ -1449,10 +1449,6 @@ emoji-picker {
     /* OR a distinct gray: color: #9CA3AF; */
 }
 
-a:-webkit-any-link {
-    /* cursor: pointer; */
-    /* text-decoration: underline; */
-}
 
 /* ========================================================= */
 /* --- REAL-TIME CALL INTERFACE STYLES (PREMIUM) --- */
@@ -1478,6 +1474,114 @@ a:-webkit-any-link {
     opacity: 0;
     visibility: hidden;
     transform: scale(1.1);
+}
+
+.call-interface-overlay.minimized {
+    width: auto;
+    max-width: 350px;
+    height: auto;
+    top: 20px;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(15px);
+    border-radius: 24px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    z-index: 100000;
+}
+
+.call-interface-overlay.minimized .call-interface-content {
+    flex-direction: row;
+    gap: 1.5rem;
+    width: auto;
+    padding: 0 10px;
+}
+
+.call-interface-overlay.minimized .call-avatar-container {
+    width: 40px;
+    height: 40px;
+}
+
+.call-interface-overlay.minimized .call-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+}
+
+.call-interface-overlay.minimized .call-pulse-ring {
+    display: none;
+}
+
+.call-interface-overlay.minimized .call-header-info {
+    text-align: left;
+}
+
+.call-interface-overlay.minimized .call-header-info h2,
+.call-interface-overlay.minimized .call-header-info p,
+.call-interface-overlay.minimized .sound-visualizer,
+.call-interface-overlay.minimized .call-footer-hint {
+    display: none;
+}
+
+.call-interface-overlay.minimized .call-timer {
+    font-size: 1.2rem;
+    margin-top: 0;
+}
+
+.call-interface-overlay.minimized .call-actions-container {
+    margin-top: 0;
+    gap: 0.75rem;
+}
+
+.call-interface-overlay.minimized .call-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
+}
+
+.call-interface-overlay.minimized .call-btn.danger {
+    width: 36px;
+    height: 36px;
+}
+
+.minimize-call-btn {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    z-index: 100001;
+    transition: all 0.2s;
+}
+
+.minimize-call-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.call-interface-overlay.minimized .minimize-call-btn {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    order: 4;
+    /* Put it at the end of the row */
 }
 
 .call-interface-content {
