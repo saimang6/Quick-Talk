@@ -112,8 +112,8 @@ body.no-scroll {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 100dvh;
 }
 
 /* MAIN CONTAINER (Should take full screen on mobile) */
@@ -204,17 +204,26 @@ body.no-scroll {
 }
 
 /* Right: Leave Button */
-.hamburger-leave-container {
+.leave-container {
+    height: 100%;
+    min-height: 60px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     align-items: end;
 }
 
+.voip-hamburger-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 10px;
+}
+
 .leave-button {
+    width: 5.5rem;
     padding: 0.5rem 1rem;
     background-color: #EF4444;
-    /* Red button */
     color: white;
     border: none;
     border-radius: 0.5rem;
@@ -237,7 +246,6 @@ body.no-scroll {
     border: none;
     color: white;
     cursor: pointer;
-    padding: 0.5rem;
     margin-top: 5px;
 }
 
@@ -289,17 +297,11 @@ body.no-scroll {
 /* --- NEW: Base style for ALL list items --- */
 .user-list-item-base {
     padding: 0.75rem;
-    /* p-3 */
     color: #F9FAFB;
-    /* text-white/lighter */
     background-color: rgba(55, 65, 81, 0.5);
-    /* bg-gray-700/50 */
     border-radius: 0.5rem;
-    /* rounded-lg */
     margin-bottom: 0.5rem;
-    /* mb-2 */
     font-weight: 500;
-    /* font-medium */
     display: flex;
     align-items: center;
     transition: all 0.2s;
@@ -316,8 +318,6 @@ body.no-scroll {
     color: #fff;
     border: 1px solid #6366F1;
 }
-
-/* Existing legacy .user-list li removed as .user-list-item-base replaces it */
 
 /* Drawer Backdrop (Used only on mobile, hidden on desktop) */
 .drawer-backdrop {
@@ -551,6 +551,10 @@ body.no-scroll {
     word-break: break-word; */
 }
 
+.system-message-bubble p {
+    margin: 8px 0px;
+}
+
 .message-mine {
     background-color: #4F46E5;
     color: white;
@@ -652,8 +656,8 @@ body.no-scroll {
 
     /* Ensure full height and width takeover */
     .full-screen-wrapper {
-        height: 100vh;
-        min-height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
     }
 
     .main-chat-container {
@@ -673,6 +677,15 @@ body.no-scroll {
         /* Larger input text */
         padding: 0.9rem;
         width: 80%;
+    }
+
+    .user-list-title {
+        font-size: 1.1rem;
+    }
+
+    .user-list-item-base,
+    .current-user-highlight {
+        font-size: 1.1rem;
     }
 
     /* Button Sizes and Padding */
@@ -769,11 +782,10 @@ body.no-scroll {
 
     /* --- End Header adjustments --- */
 
-
     /* Ensure full height and width takeover */
     .full-screen-wrapper {
-        height: 100vh;
-        min-height: 100vh;
+        height: 100dvh;
+        min-height: 100dvh;
     }
 
     .main-chat-container {
@@ -829,6 +841,15 @@ body.no-scroll {
     .modal-content-card p {
         font-size: 1.05rem !important;
     }
+
+    .user-list-title {
+        font-size: 1rem;
+    }
+
+    .user-list-item-base,
+    .current-user-highlight {
+        font-size: 1rem;
+    }
 }
 
 @media (max-width: 375px) {
@@ -857,6 +878,15 @@ body.no-scroll {
 
     .message-bubble {
         max-width: 80%;
+    }
+
+    .user-list-title {
+        font-size: 1rem;
+    }
+
+    .user-list-item-base,
+    .current-user-highlight {
+        font-size: 1rem;
     }
 
 }
@@ -933,6 +963,15 @@ body.no-scroll {
     .modal-content-card p {
         font-size: 1.0rem !important;
     }
+
+    .user-list-title {
+        font-size: 0.95rem;
+    }
+
+    .user-list-item-base,
+    .current-user-highlight {
+        font-size: 0.95rem;
+    }
 }
 
 /* ========================================================= */
@@ -997,8 +1036,6 @@ body.no-scroll {
     /* Show the hamburger button in the header */
     .hamburger-button {
         display: block;
-        order: 3;
-        /* Push to the right, next to the Leave button */
     }
 
     /* Mobile Drawer: Slides over the content */
@@ -1007,7 +1044,7 @@ body.no-scroll {
         top: 0;
         right: 0;
         height: 100%;
-        width: 150px;
+        width: 160px;
         border-left: none;
         box-shadow: -4px 0 10px rgba(0, 0, 0, 0.4);
         z-index: 40;
@@ -1415,4 +1452,241 @@ emoji-picker {
 a:-webkit-any-link {
     /* cursor: pointer; */
     /* text-decoration: underline; */
+}
+
+/* ========================================================= */
+/* --- REAL-TIME CALL INTERFACE STYLES (PREMIUM) --- */
+/* ========================================================= */
+
+.call-interface-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    color: white;
+    backdrop-filter: blur(20px);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.call-interface-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(1.1);
+}
+
+.call-interface-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+    width: 90%;
+    max-width: 450px;
+}
+
+/* Pulsing Avatar */
+.call-avatar-container {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.call-avatar {
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    z-index: 10;
+    box-shadow: 0 0 30px rgba(79, 70, 229, 0.5);
+}
+
+.call-pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid rgba(124, 58, 237, 0.5);
+    border-radius: 50%;
+    animation: call-pulse 2.5s infinite ease-out;
+}
+
+.call-pulse-ring.delay-1 {
+    animation-delay: 0.8s;
+}
+
+.call-pulse-ring.delay-2 {
+    animation-delay: 1.6s;
+}
+
+@keyframes call-pulse {
+    0% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+/* Call Info */
+.call-header-info {
+    text-align: center;
+}
+
+.call-header-info h2 {
+    font-size: 1.8rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.call-header-info p {
+    color: #94a3b8;
+    margin: 0.5rem 0 0;
+    font-size: 1.1rem;
+}
+
+.call-timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem;
+    color: #10b981;
+    margin-top: 1rem;
+    font-weight: 300;
+}
+
+/* Visualizer */
+.sound-visualizer {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 40px;
+}
+
+.sound-visualizer .bar {
+    width: 6px;
+    background: #10b981;
+    border-radius: 3px;
+    animation: viz-grow 1s infinite ease-in-out;
+}
+
+.sound-visualizer .bar:nth-child(1) {
+    height: 10%;
+    animation-delay: -0.2s;
+}
+
+.sound-visualizer .bar:nth-child(2) {
+    height: 30%;
+    animation-delay: -0.4s;
+}
+
+.sound-visualizer .bar:nth-child(3) {
+    height: 100%;
+    animation-delay: -0.6s;
+}
+
+.sound-visualizer .bar:nth-child(4) {
+    height: 60%;
+    animation-delay: -0.8s;
+}
+
+.sound-visualizer .bar:nth-child(5) {
+    height: 20%;
+    animation-delay: -1.0s;
+}
+
+.sound-visualizer .bar:nth-child(6) {
+    height: 40%;
+    animation-delay: -1.2s;
+}
+
+@keyframes viz-grow {
+
+    0%,
+    100% {
+        transform: scaleY(0.5);
+    }
+
+    50% {
+        transform: scaleY(1.5);
+    }
+}
+
+/* Actions */
+.call-actions-container {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.call-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: white;
+}
+
+.call-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.call-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-4px);
+}
+
+.call-btn.active {
+    background: rgba(239, 68, 68, 0.3) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+.call-btn.danger {
+    background: #ef4444;
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+    box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);
+}
+
+.call-btn.danger:hover {
+    background: #dc2626;
+    transform: scale(1.1) rotate(-10deg);
+}
+
+.call-footer-hint {
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+@media (max-width: 640px) {
+    .call-btn {
+        width: 56px;
+        height: 56px;
+    }
+
+    .call-btn.danger {
+        width: 72px;
+        height: 72px;
+    }
 }

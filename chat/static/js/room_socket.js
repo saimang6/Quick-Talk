@@ -105,7 +105,155 @@ function cleanupWebRTC() {
         remoteAudio.srcObject = null;
         remoteAudio.remove();
     }
+
+    // 4. Hide Call UI
+    hideCallInterface();
 }
+
+/**
+ * --- CALL UI MANAGEMENT ---
+ */
+let callTimerInterval = null;
+let callStartTime = null;
+let isMicMuted = false;
+let isSpeakerMuted = false;
+
+function showCallInterface() {
+    const overlay = document.getElementById('call-interface-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        resetCallUIStates(); // Reset buttons to default on show
+        startCallTimer();
+    }
+}
+
+function resetCallUIStates() {
+    isMicMuted = false;
+    isSpeakerMuted = false;
+
+    const muteBtn = document.getElementById('mute-call-btn');
+    const speakerBtn = document.getElementById('speaker-call-btn');
+
+    if (muteBtn) {
+        muteBtn.classList.remove('active');
+        muteBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+        muteBtn.title = "Mute Microphone";
+    }
+
+    if (speakerBtn) {
+        speakerBtn.classList.remove('active');
+        speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        speakerBtn.title = "Mute Speaker";
+    }
+}
+
+function toggleMic() {
+    if (!localStream) return;
+
+    isMicMuted = !isMicMuted;
+    const audioTracks = localStream.getAudioTracks();
+
+    audioTracks.forEach(track => {
+        track.enabled = !isMicMuted;
+    });
+
+    const muteBtn = document.getElementById('mute-call-btn');
+    if (muteBtn) {
+        if (isMicMuted) {
+            muteBtn.classList.add('active');
+            muteBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+            muteBtn.title = "Unmute Microphone";
+        } else {
+            muteBtn.classList.remove('active');
+            muteBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            muteBtn.title = "Mute Microphone";
+        }
+    }
+
+    console.log("Microphone " + (isMicMuted ? "muted" : "unmuted"));
+}
+
+function toggleSpeaker() {
+    isSpeakerMuted = !isSpeakerMuted;
+    const remoteAudio = document.getElementById('remote-voip-audio');
+
+    if (remoteAudio) {
+        remoteAudio.muted = isSpeakerMuted;
+    }
+
+    const speakerBtn = document.getElementById('speaker-call-btn');
+    if (speakerBtn) {
+        if (isSpeakerMuted) {
+            speakerBtn.classList.add('active');
+            speakerBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+            speakerBtn.title = "Unmute Speaker";
+        } else {
+            speakerBtn.classList.remove('active');
+            speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+            speakerBtn.title = "Mute Speaker";
+        }
+    }
+
+    console.log("Speaker " + (isSpeakerMuted ? "muted" : "unmuted"));
+}
+
+function hideCallInterface() {
+    const overlay = document.getElementById('call-interface-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        stopCallTimer();
+    }
+}
+
+function startCallTimer() {
+    callStartTime = Date.now();
+    const timerDisplay = document.getElementById('call-timer');
+
+    if (callTimerInterval) clearInterval(callTimerInterval);
+
+    callTimerInterval = setInterval(() => {
+        const delta = Date.now() - callStartTime;
+        const totalSeconds = Math.floor(delta / 1000);
+        const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+        if (timerDisplay) {
+            timerDisplay.textContent = `${minutes}:${seconds}`;
+        }
+    }, 1000);
+}
+
+function stopCallTimer() {
+    if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+    }
+    const timerDisplay = document.getElementById('call-timer');
+    if (timerDisplay) timerDisplay.textContent = "00:00";
+}
+
+// Global listener for Call UI buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const hangupBtn = document.getElementById('hangup-call-btn');
+    const muteBtn = document.getElementById('mute-call-btn');
+    const speakerBtn = document.getElementById('speaker-call-btn');
+
+    if (hangupBtn) {
+        hangupBtn.addEventListener('click', () => {
+            console.log("Hangup requested by user.");
+            cleanupWebRTC();
+            displayMessage('System', '🚫 You left the call.', 'voip-left-' + Date.now());
+        });
+    }
+
+    if (muteBtn) {
+        muteBtn.addEventListener('click', toggleMic);
+    }
+
+    if (speakerBtn) {
+        speakerBtn.addEventListener('click', toggleSpeaker);
+    }
+});
 
 async function createPeerConnection() {
     console.log("Initializing new RTCPeerConnection...");
@@ -207,6 +355,7 @@ async function createPeerConnection() {
         });
 
         displayMessage('System', '🎙️ Voice call active.', Date.now());
+        showCallInterface();
     };
 }
 

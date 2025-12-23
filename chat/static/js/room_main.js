@@ -432,6 +432,7 @@ async function startVoiceCall() {
         }));
 
         console.log("Call offer sent successfully!");
+        showCallInterface();
     } catch (err) {
         console.error("Could not start voice call:", err);
         Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');

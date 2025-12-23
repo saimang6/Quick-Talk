@@ -20,6 +20,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
         integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
         /* NEW: Force text wrapping in message bubbles for long filenames/URLs */
         .message-bubble p,
@@ -244,29 +246,31 @@
 
             </div>
 
-            <div class="hamburger-leave-container">
+            <div class="leave-container">
                 <button id="leave-room-btn" class="leave-button">Leave</button>
 
-                <button id="hamburger-menu-btn" class="hamburger-button" aria-label="Toggle user list">
-                    <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fill-rule="evenodd"
-                            d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                            clip-rule="evenodd"></path>
-                    </svg>
-                </button>
-            </div>
+                <div class="voip-hamburger-container">
+                    <button id="hamburger-menu-btn" class="hamburger-button" aria-label="Toggle user list">
+                        <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd"
+                                d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                                clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
 
-            <button id="voip-call-btn" class="p-2 bg-green-500 text-white rounded-full">
-                📞 Start Call
-            </button>
+                    <button id="voip-call-btn"
+                        class="mt-4 flex items-center justify-center p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                    </button>
+
+                </div>
+            </div>
 
         </header>
-
-        <!-- <div id="requests-panel" class="requests-sidebar hidden-panel">
-            <h3>Pending Join Requests</h3>
-            <div id="pending-requests-container">
-            </div>
-        </div> -->
 
         <div id="requests-panel" class="requests-sidebar hidden-panel">
             <div class="sidebar-header">
@@ -380,16 +384,6 @@
     </div>
 
     {% if not is_owner %}
-    <!-- <div id="request-overlay" class="request-approval-overlay">
-        <h1>Request Access</h1>
-        <p id="overlay-status-message">Click the button below to send your join request to the room owner.</p>
-        <button id="send-join-request-btn"
-            style="margin-top: 1.5rem; padding: 0.75rem 1.5rem; background-color: #4F46E5; color: white; border-radius: 0.5rem; text-decoration: none; font-weight: bold; transition: background-color 0.2s;">
-            Send Join Request
-        </button>
-        <p id="denial-message-display" class="denial-message" style="display: none;">Access Denied. Redirecting to
-            lobby...</p>
-    </div> -->
     <div id="request-overlay" class="request-approval-overlay">
         <div class="request-card">
             <div class="icon-pulse">
@@ -498,6 +492,55 @@
                     Dismiss
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ACTIVE CALL INTERFACE OVERLAY -->
+    <div id="call-interface-overlay" class="call-interface-overlay hidden">
+        <div class="call-interface-content">
+            <!-- Call Pulse Animation -->
+            <div class="call-avatar-container">
+                <div class="call-pulse-ring"></div>
+                <div class="call-pulse-ring delay-1"></div>
+                <div class="call-pulse-ring delay-2"></div>
+                <div class="call-avatar">
+                    <i class="fas fa-phone-alt"></i>
+                </div>
+            </div>
+
+            <!-- Call Info -->
+            <div class="call-header-info">
+                <h2 id="call-status-text">Ongoing Voice Call</h2>
+                <p id="call-participant-name">All Participants</p>
+                <div id="call-timer" class="call-timer">00:00</div>
+            </div>
+
+            <!-- Sound Visualizer Bars -->
+            <div class="sound-visualizer">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+
+            <!-- Actions Container -->
+            <div class="call-actions-container">
+                <button id="mute-call-btn" class="call-btn secondary" title="Mute Microphone">
+                    <i class="fas fa-microphone"></i>
+                </button>
+
+                <button id="hangup-call-btn" class="call-btn danger" title="End Call">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+
+                <button id="speaker-call-btn" class="call-btn secondary" title="Speaker">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+            </div>
+
+            <p class="call-footer-hint">Tapping "End Call" will disconnect you from the voice session</p>
         </div>
     </div>
 
