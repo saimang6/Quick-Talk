@@ -203,6 +203,41 @@
                 right: 0;
             }
         }
+
+        /* Scroll to bottom button styles */
+        #scroll-to-bottom-btn.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Subtle bounce animation when it appears */
+        @keyframes bounce-in {
+            0% {
+                transform: translateY(10px);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        #scroll-to-bottom-btn.show {
+            animation: bounce-in 0.4s ease-out;
+        }
+
+        /* Ensure the button doesn't get hidden behind the mobile keyboard */
+        @media (max-width: 768px) {
+            #scroll-to-bottom-btn {
+                bottom: 5rem;
+                right: 1rem;
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 
@@ -250,20 +285,23 @@
                 <button id="leave-room-btn" class="leave-button">Leave</button>
 
                 <div class="voip-hamburger-container">
-                    <button id="hamburger-menu-btn" class="hamburger-button" aria-label="Toggle user list">
-                        <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd"
-                                d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                    </button>
 
                     <button id="voip-call-btn"
-                        class="mt-4 flex items-center justify-center p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 active:scale-95">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        class="flex items-center justify-center p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                    </button>
+
+                    <button id="hamburger-menu-btn"
+                        class="flex items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg border border-slate-700 transition-all duration-200 active:scale-95 shadow-md"
+                        aria-label="Toggle user list">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                     </button>
 
@@ -302,6 +340,14 @@
 
         </div>
 
+        <button id="scroll-to-bottom-btn"
+            class="fixed bottom-24 right-6 p-3 bg-indigo-600 text-white rounded-full shadow-2xl transition-all duration-300 opacity-0 translate-y-10 pointer-events-none hover:bg-indigo-500 active:scale-90 z-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+        </button>
+
         <footer class="chat-footer" style="position: relative;"> <!-- Ensure footer is relative context -->
             <!-- NEW: Mention Suggestions Popup - moved to root of footer for z-index safety -->
             <div id="mention-suggestions" class="mention-suggestions hidden">
@@ -339,6 +385,20 @@
                         <emoji-picker></emoji-picker>
                     </div>
 
+                    <div id="gif-picker-container" class="gif-picker-container hidden">
+                        <div class="gif-search-wrapper">
+                            <input type="text" id="gif-search-input" placeholder="Search GIPHY...">
+                            <button id="close-gif-picker">&times;</button>
+                        </div>
+                        <div id="gif-results" class="gif-results-grid">
+                            <!-- GIFs will be loaded here -->
+                        </div>
+                        <div class="giphy-attribution">
+                            <img src="https://static.okicdn.com/giphy/giphy-attribution-mark.png"
+                                alt="Powered by GIPHY">
+                        </div>
+                    </div>
+
                     <div class="emoji-input-container">
                         <!-- NEW: Emoji Toggle Button -->
                         <button id="emoji-toggle-btn" aria-label="Toggle Emoji Picker">
@@ -355,6 +415,19 @@
                         <input id="chat-message-input" type="text" placeholder="Type your message..."
                             class="chat-input-base message-input">
 
+                        <!-- NEW: GIF Toggle Button -->
+                        <button id="gif-toggle-btn" aria-label="Toggle GIF Picker" class="gif-toggle-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <polyline points="9 12 9 12"></polyline>
+                                <path d="M7 10h3v4H7z"></path>
+                                <path d="M14 10h3"></path>
+                                <path d="M14 14h3"></path>
+                                <path d="M14 12h2"></path>
+                            </svg>
+                        </button>
                     </div>
 
 
@@ -544,8 +617,6 @@
                     <i class="fas fa-volume-up"></i>
                 </button>
             </div>
-
-            <p class="call-footer-hint">Tapping "End Call" will disconnect you from the voice session</p>
         </div>
     </div>
 
@@ -554,6 +625,7 @@
     <script src="{% static 'js/room_utils.js' %}"></script>
     <script src="{% static 'js/room_ui.js' %}"></script>
     <script src="{% static 'js/room_socket.js' %}"></script>
+    <script src="{% static 'js/room_gif.js' %}"></script>
     <script src="{% static 'js/room_main.js' %}"></script>
 </body>
 

@@ -397,12 +397,27 @@ class ChatConsumer(WebsocketConsumer):
         # 2. Format the messages
         messages_to_send = []
         for message in messages_qs:
+            # Determine the attachment URL: prioritized external_attachment_url (GIFs) over internal attachment
+            attachment_url = message.external_attachment_url
+            if not attachment_url and message.attachment:
+                attachment_url = message.attachment.url
+
+            is_image = False
+            if attachment_url:
+                # Simple check for image extension or GIPHY/external image
+                if message.external_attachment_url:
+                    is_image = True # Assume external URLs passed here are images (GIFs)
+                elif message.attachment and message.attachment.name:
+                    is_image = any(message.attachment.name.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+
             messages_to_send.append({
                 'type': 'message',
                 'message': message.content,
                 'sender': message.sender,
                 'message_id': str(message.pk),
-                'timestamp': str(message.timestamp), # ADDED
+                'timestamp': str(message.timestamp),
+                'attachment_url': attachment_url,
+                'is_image': is_image,
                 'reactions': self.get_message_reactions(message.pk),
                 'reply_to': {
                     'sender': message.reply_to.sender,
@@ -623,11 +638,15 @@ class ChatConsumer(WebsocketConsumer):
                 }))
                 return
                 
+            external_attachment_url = text_data_json.get('attachment_url')
+            is_image = text_data_json.get('is_image', False)
+
             new_message = Message.objects.create(
                 room=self.room_instance,
                 sender=sender,
                 content=message_content,
-                reply_to=reply_to_instance
+                reply_to=reply_to_instance,
+                external_attachment_url=external_attachment_url
             )
             
             reply_to_data = None
@@ -645,7 +664,9 @@ class ChatConsumer(WebsocketConsumer):
                     'message': message_content,
                     'sender': sender,
                     'message_id': str(new_message.pk), 
-                    'reply_to': reply_to_data
+                    'reply_to': reply_to_data,
+                    'attachment_url': external_attachment_url,
+                    'is_image': is_image
                 }
             )
 

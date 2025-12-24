@@ -912,3 +912,38 @@ function updateMessageReactions(messageId, reactionsData) {
         container.appendChild(badge);
     });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const chatLog = document.getElementById('chat-log');
+    const scrollBtn = document.getElementById('scroll-to-bottom-btn');
+
+    const handleScroll = () => {
+        // Mobile browsers sometimes have fractional scroll values
+        const scrollPos = chatLog.scrollTop + chatLog.clientHeight;
+        const totalHeight = chatLog.scrollHeight;
+
+        // If user is more than 200px away from the bottom, show button
+        if (totalHeight - scrollPos > 200) {
+            scrollBtn.classList.add('show');
+        } else {
+            scrollBtn.classList.remove('show');
+        }
+    };
+
+    // Use a passive listener for better scroll performance on mobile
+    chatLog.addEventListener('scroll', handleScroll, { passive: true });
+
+    scrollBtn.addEventListener('click', () => {
+        chatLog.scrollTo({
+            top: chatLog.scrollHeight,
+            behavior: 'smooth'
+        });
+    });
+
+    // Special: Hide button when keyboard opens to prevent UI clutter
+    const inputField = document.getElementById('chat-message-input');
+    inputField.addEventListener('focus', () => {
+        // Optional: Hide button when typing to save screen space
+        scrollBtn.classList.remove('show');
+    });
+});

@@ -373,6 +373,11 @@ if (emojiPicker && messageInputDom) {
         messageInputDom.selectionStart = messageInputDom.selectionEnd = start + emoji.length;
 
         messageInputDom.focus();
+
+        // NEW: Trigger GIF search if the emoji has an annotation/name
+        if (window.searchGIFsByTerm && event.detail.emoji.annotation) {
+            window.searchGIFsByTerm(event.detail.emoji.annotation);
+        }
     });
 }
 

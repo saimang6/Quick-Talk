@@ -38,6 +38,9 @@ class Message(models.Model):
 
     # NEW: Store file attachments
     attachment = models.FileField(upload_to='attachments/', blank=True, null=True)
+    
+    # NEW: Store external URLs (like GIPHY)
+    external_attachment_url = models.URLField(max_length=500, blank=True, null=True)
 
     # NEW: Reply functionality
     reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replies')

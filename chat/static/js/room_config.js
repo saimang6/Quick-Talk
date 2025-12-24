@@ -55,6 +55,7 @@ const requestToggleBtn = document.getElementById('request-display-toggle');
 const pendingRequestsContainer = document.getElementById('pending-requests-container');
 const bellIconDom = document.querySelector('#request-display-toggle .fas.fa-bell');
 const creatorInfoContainer = document.querySelector('#creator-info');
+const currentUserDisplay = document.querySelector('#current-user-display');
 const emojiToggleBtn = document.getElementById('emoji-toggle-btn');
 const pickerContainer = document.getElementById('emoji-picker-container');
 const emojiPicker = pickerContainer ? pickerContainer.querySelector('emoji-picker') : null; // Safely select emoji picker
@@ -102,5 +103,6 @@ if (creatorInfoContainer) {
     } else {
         // Hide the info if the current user is not the owner
         creatorInfoContainer.style.display = 'none';
+        currentUserDisplay.style.marginTop = '23px';
     }
 }
