@@ -17,67 +17,57 @@ let iceConfig = {
 };
 
 /**
- * Fetches fresh TURN server credentials from Metered.ca API.
- * This ensures credentials are always valid for cross-network calls.
- * @returns {Promise<Object>} ICE configuration with TURN servers
+ * Returns unlimited TURN server credentials from the Open Relay Project.
+ * This replaces the rate-limited Metered.ca API to allow unlimited calls.
+ * @returns {Promise<Object>} ICE configuration with robust TURN fallback
  */
 async function fetchTurnCredentials() {
-    try {
-        // Metered.ca TURN server API - using quicktalk app
-        const response = await fetch("https://quicktalk.metered.live/api/v1/turn/credentials?apiKey=f5f8750f2bb6f9b2c77af9c980b8f0688ab6");
+    console.log("Using Unlimited Open Relay Project TURN servers...");
 
-        if (!response.ok) {
-            throw new Error(`TURN API returned ${response.status}`);
-        }
+    // Static configuration for Open Relay Project
+    // Unlimited, community-funded STUN/TURN servers
+    const config = {
+        iceServers: [
+            // Standard Google STUN servers (Fastest for P2P discovery)
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
 
-        const iceServers = await response.json();
-        console.log("Fetched fresh TURN credentials:", iceServers.length, "servers");
+            // OpenRelay TURN servers (Static Unlimited Credentials)
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            }
+        ],
+        iceCandidatePoolSize: 10
+    };
 
-        return {
-            iceServers: iceServers,
-            iceCandidatePoolSize: 10
-        };
-    } catch (err) {
-        console.warn("Failed to fetch TURN credentials, using hardcoded TURN fallback:", err.message);
-
-        // Hardcoded fallback with multiple TURN options
-        return {
-            iceServers: [
-                // STUN servers
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                // OpenRelay TURN servers (static credentials)
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                },
-                {
-                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
-                }
-            ],
-            iceCandidatePoolSize: 10
-        };
-    }
+    return config;
 }
 
 let peerConnection = null;
 let localStream = null; // Track local audio stream for cleanup
 let iceCandidateQueue = []; // Queue for ICE candidates that arrive before remote description
+let pendingCallData = null; // Stores incoming offer while waiting for Accept/Deny
 
 
 /**
  * Cleans up WebRTC resources (peer connection, audio elements, streams)
+ * @param {boolean} keepQueue - If true, preserves the iceCandidateQueue (used during call setup phase)
  */
-function cleanupWebRTC() {
-    console.log("Cleaning up WebRTC resources...");
+function cleanupWebRTC(keepQueue = false) {
+    console.log("Cleaning up WebRTC resources... (keepQueue: " + keepQueue + ")");
 
     // 1. Stop all local audio tracks
     if (localStream) {
@@ -94,8 +84,10 @@ function cleanupWebRTC() {
         peerConnection = null;
     }
 
-    // 3. Clear ICE candidate queue
-    iceCandidateQueue = [];
+    // 3. Clear ICE candidate queue unless requested otherwise
+    if (!keepQueue) {
+        iceCandidateQueue = [];
+    }
 
 
     // 3. Remove and clear the remote audio element
@@ -118,12 +110,31 @@ let callStartTime = null;
 let isMicMuted = false;
 let isSpeakerMuted = false;
 
-function showCallInterface() {
+/**
+ * Shows the call interface overlay.
+ * @param {boolean} isIncoming - Whether this is an incoming call (shows Accept/Deny) or outgoing (shows Hangup)
+ */
+function showCallInterface(isIncoming = false) {
     const overlay = document.getElementById('call-interface-overlay');
+    const ongoingActions = document.getElementById('ongoing-call-actions');
+    const incomingActions = document.getElementById('incoming-call-actions');
+    const statusText = document.getElementById('call-status-text');
+
     if (overlay) {
         overlay.classList.remove('hidden');
-        resetCallUIStates(); // Reset buttons to default on show
-        startCallTimer();
+        resetCallUIStates();
+
+        if (isIncoming) {
+            if (ongoingActions) ongoingActions.classList.add('hidden');
+            if (incomingActions) incomingActions.classList.remove('hidden');
+            if (statusText) statusText.textContent = "Incoming Voice Call";
+            stopCallTimer();
+        } else {
+            if (ongoingActions) ongoingActions.classList.remove('hidden');
+            if (incomingActions) incomingActions.classList.add('hidden');
+            if (statusText) statusText.textContent = "Ongoing Voice Call";
+            startCallTimer();
+        }
     }
 }
 
@@ -263,6 +274,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const speakerBtn = document.getElementById('speaker-call-btn');
     const minimizeBtn = document.getElementById('minimize-call-btn');
 
+    // Accept/Deny buttons
+    const acceptBtn = document.getElementById('accept-call-btn');
+    const denyBtn = document.getElementById('deny-call-btn');
+
     if (hangupBtn) {
         hangupBtn.addEventListener('click', () => {
             console.log("Hangup requested by user.");
@@ -286,6 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', acceptCall);
+    }
+
+    if (denyBtn) {
+        denyBtn.addEventListener('click', denyCall);
+    }
+
     // Expand when clicking the minimized pill (but not its buttons)
     const callOverlay = document.getElementById('call-interface-overlay');
     if (callOverlay) {
@@ -300,11 +323,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-async function createPeerConnection() {
-    console.log("Initializing new RTCPeerConnection...");
+async function createPeerConnection(preserveCandidates = false) {
+    console.log("Initializing new RTCPeerConnection... (Preserve Candidates: " + preserveCandidates + ")");
 
     // CRITICAL: Clean up any existing connection first
-    cleanupWebRTC();
+    cleanupWebRTC(preserveCandidates);
 
     // Fetch fresh TURN credentials for cross-network support
     const freshConfig = await fetchTurnCredentials();
@@ -399,7 +422,7 @@ async function createPeerConnection() {
             }, { once: true });
         });
 
-        displayMessage('System', '🎙️ Voice call active.', Date.now());
+        displayMessage('System', '🎙️ Voice call active.', 'voip-active-' + Date.now());
         showCallInterface();
     };
 }
@@ -947,41 +970,61 @@ function handleSocketMessage(e) {
 
 // --- VoIP / WebRTC FUNCTIONS ---
 
-// Function to handle an incoming call (The "Answer" logic)
+// Function to handle an incoming call (Show UI, wait for Accept/Deny)
 async function handleIncomingCall(offer, sender) {
+    console.log("=== INCOMING CALL ===");
+    console.log("Incoming call from:", sender);
+
+    // Save offer and sender for later acceptance
+    pendingCallData = { offer, sender };
+
+    // Update UI and participant info
+    const participantName = document.getElementById('call-participant-name');
+    if (participantName) participantName.textContent = sender;
+
+    // Show overlay in "Incoming" mode (Accept/Deny)
+    showCallInterface(true);
+
+    // Show notification that we're receiving a call
+    displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+}
+
+/**
+ * Logic to accept an incoming call
+ */
+async function acceptCall() {
+    if (!pendingCallData) return;
+    const { offer, sender } = pendingCallData;
+    pendingCallData = null; // Clear pending data
+
     try {
-        console.log("=== INCOMING CALL ===");
-        console.log("Handling incoming call from:", sender);
+        console.log("Accepting call from:", sender);
 
-        // Show notification that we're receiving a call
-        displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+        // Switch UI to "Ongoing" mode
+        showCallInterface(false);
 
-        // Initialize the connection object first (this also cleans up old connections)
-        console.log("Step 1: Creating peer connection...");
-        await createPeerConnection();
-        console.log("Step 1: Peer connection created successfully");
+        // Initialize the connection object - PRESERVE the candidates we received while the overlay was visible!
+        console.log("Step 1: Creating peer connection (preserving queued candidates)...");
+        await createPeerConnection(true);
 
-        // Get microphone access and store in global for cleanup
+        // Get microphone access
         console.log("Step 2: Requesting microphone access...");
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log("Step 2: Microphone access granted, tracks:", localStream.getTracks().length);
 
         localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
-            console.log("Step 2: Added track to peer connection:", track.kind, track.readyState);
+            console.log("Step 2: Added track to peer connection:", track.kind);
         });
 
         console.log("Step 3: Setting remote description (offer)...");
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        console.log("Step 3: Remote description set successfully");
 
-        // CRITICAL: Process any ICE candidates that were queued while we were setting up
+        // Process any queued ICE candidates
         console.log("Step 3.5: Processing", iceCandidateQueue.length, "queued ICE candidates...");
         while (iceCandidateQueue.length > 0) {
             const candidate = iceCandidateQueue.shift();
             try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log("Added queued ICE candidate");
             } catch (err) {
                 console.error("Error adding queued ICE candidate:", err);
             }
@@ -989,11 +1032,9 @@ async function handleIncomingCall(offer, sender) {
 
         console.log("Step 4: Creating answer...");
         const answer = await peerConnection.createAnswer();
-        console.log("Step 4: Answer created, type:", answer.type);
 
         console.log("Step 5: Setting local description (answer)...");
         await peerConnection.setLocalDescription(answer);
-        console.log("Step 5: Local description set successfully");
 
         console.log("Step 6: Sending answer to", sender);
         chatSocket.send(JSON.stringify({
@@ -1002,16 +1043,29 @@ async function handleIncomingCall(offer, sender) {
             'target_user': sender
         }));
 
-        console.log("=== CALL ANSWER SENT SUCCESSFULLY ===");
-        displayMessage('System', '📱 Answering call...', 'voip-answering-' + Date.now());
+        console.log("=== CALL ACCEPTED AND CONNECTED ===");
+        displayMessage('System', '📱 Call connected.', 'voip-answering-' + Date.now());
 
     } catch (err) {
-        console.error("=== INCOMING CALL FAILED ===");
-        console.error("Failed to handle incoming call:", err);
-        console.error("Error name:", err.name);
-        console.error("Error message:", err.message);
-        displayMessage('System', '❌ Failed to answer call: ' + err.message, 'voip-error-' + Date.now());
+        console.error("=== FAILED TO ACCEPT CALL ===");
+        console.error(err);
+        cleanupWebRTC();
+        displayMessage('System', '❌ Failed to connect call: ' + err.message, 'voip-error-' + Date.now());
     }
+}
+
+/**
+ * Logic to deny an incoming call
+ */
+function denyCall() {
+    if (!pendingCallData) return;
+    console.log("Denying call from:", pendingCallData.sender);
+
+    // Notify the other side optionally (for now just cleanup)
+    pendingCallData = null;
+    cleanupWebRTC();
+
+    displayMessage('System', '❌ Call denied.', 'voip-denied-' + Date.now());
 }
 
 

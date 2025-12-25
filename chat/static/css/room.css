@@ -1750,6 +1750,29 @@ emoji-picker {
     transform: scale(1.05);
 }
 
+.call-btn.success {
+    background: #10b981;
+    /* Green-500 */
+}
+
+.call-btn.success:hover {
+    background: #059669;
+    /* Green-600 */
+    transform: scale(1.05);
+}
+
+.call-actions-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.call-actions-group.hidden {
+    display: none;
+}
+
 .minimize-call-btn {
     position: absolute;
     top: 20px;

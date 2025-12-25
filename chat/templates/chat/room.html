@@ -572,18 +572,31 @@
             </div>
 
             <!-- Actions Container -->
-            <div class="call-actions-container">
-                <button id="mute-call-btn" class="call-btn secondary" title="Mute Microphone">
-                    <i class="fas fa-microphone"></i>
-                </button>
+            <div id="call-actions-container" class="call-actions-container">
+                <!-- Ongoing Call Actions (visible when in a call) -->
+                <div id="ongoing-call-actions" class="call-actions-group">
+                    <button id="mute-call-btn" class="call-btn secondary" title="Mute Microphone">
+                        <i class="fas fa-microphone"></i>
+                    </button>
 
-                <button id="hangup-call-btn" class="call-btn danger" title="End Call">
-                    <i class="fas fa-phone-slash"></i>
-                </button>
+                    <button id="hangup-call-btn" class="call-btn danger" title="End Call">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
 
-                <button id="speaker-call-btn" class="call-btn secondary" title="Speaker">
-                    <i class="fas fa-volume-up"></i>
-                </button>
+                    <button id="speaker-call-btn" class="call-btn secondary" title="Speaker">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+
+                <!-- Incoming Call Actions (visible when receiving a call) -->
+                <div id="incoming-call-actions" class="call-actions-group hidden">
+                    <button id="accept-call-btn" class="call-btn success" title="Accept Call">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button id="deny-call-btn" class="call-btn danger" title="Deny Call">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
