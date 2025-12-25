@@ -1826,3 +1826,96 @@ emoji-picker {
         font-size: 0.7rem;
     }
 }
+
+/* ========================================================= */
+/* --- SCROLL TO BOTTOM BUTTON --- */
+/* ========================================================= */
+
+#scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 70, 229, 0.85);
+    /* Indigo with transparency */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    z-index: 100;
+    /* High enough to be over chat log and mentions if needed */
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0;
+    transform: translateY(30px) scale(0.6);
+    pointer-events: none;
+}
+
+#scroll-to-bottom-btn.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+#scroll-to-bottom-btn:hover {
+    background: rgba(67, 56, 202, 1);
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 40px rgba(79, 70, 229, 0.4);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+#scroll-to-bottom-btn:active {
+    transform: scale(0.92);
+}
+
+#scroll-to-bottom-btn svg {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+}
+
+#scroll-to-bottom-btn:hover svg {
+    transform: translateY(2px);
+}
+
+/* Pulse animation for attention (optional, if we want to show it on new msg) */
+@keyframes button-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 15px rgba(79, 70, 229, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+    }
+}
+
+#scroll-to-bottom-btn.pulse {
+    animation: button-pulse 2s infinite;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    #scroll-to-bottom-btn {
+        bottom: 15px;
+        right: 15px;
+        width: 44px;
+        height: 44px;
+        background: rgba(79, 70, 229, 0.95);
+        /* More solid on mobile for visibility */
+    }
+
+    #scroll-to-bottom-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+}
