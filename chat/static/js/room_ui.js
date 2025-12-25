@@ -508,6 +508,25 @@ function updateUserListDisplay(users) {
         if (user === fixedUsername) {
             li.textContent += ' (You)';
             li.classList.add('current-user-highlight');
+        } else {
+            // Other users are selectable for calls
+            li.classList.add('selectable-participant');
+
+            // Check if user was already selected
+            if (selectedCallParticipants.has(user)) {
+                li.classList.add('selected-for-call');
+            }
+
+            li.onclick = () => {
+                const isSelected = li.classList.toggle('selected-for-call');
+                if (isSelected) {
+                    selectedCallParticipants.add(user);
+                    console.log(`User ${user} selected for targeted call.`);
+                } else {
+                    selectedCallParticipants.delete(user);
+                    console.log(`User ${user} deselected.`);
+                }
+            };
         }
         userListContainer.appendChild(li);
     });

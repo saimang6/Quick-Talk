@@ -380,7 +380,7 @@ async function createPeerConnection(preserveCandidates = false) {
             chatSocket.send(JSON.stringify({
                 'type': 'webrtc_signal',
                 'data': { 'ice': event.candidate },
-                'target_user': 'all'
+                'target_users': 'all'
             }));
         }
     };
@@ -1040,7 +1040,7 @@ async function acceptCall() {
         chatSocket.send(JSON.stringify({
             'type': 'webrtc_signal',
             'data': answer,
-            'target_user': sender
+            'target_users': [sender]
         }));
 
         console.log("=== CALL ACCEPTED AND CONNECTED ===");

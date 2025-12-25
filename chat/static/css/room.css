@@ -320,6 +320,46 @@ body.no-scroll {
     border: 1px solid #6366F1;
 }
 
+.selectable-participant {
+    cursor: pointer;
+    position: relative;
+    padding-right: 2.5rem;
+    /* Space for the indicator */
+}
+
+.selectable-participant:hover {
+    background-color: rgba(79, 70, 229, 0.2);
+    transform: translateX(4px);
+}
+
+.selectable-participant.selected-for-call {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    /* Greenish */
+    border: 1px solid #10b981;
+}
+
+.selectable-participant::after {
+    content: '';
+    position: absolute;
+    right: 1rem;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #4B5563;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.selectable-participant.selected-for-call::after {
+    background-color: #10b981;
+    border-color: #10b981;
+    content: '✓';
+    color: white;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* Drawer Backdrop (Used only on mobile, hidden on desktop) */
 .drawer-backdrop {
     display: none;

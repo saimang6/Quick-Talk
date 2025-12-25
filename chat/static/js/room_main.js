@@ -430,13 +430,25 @@ async function startVoiceCall() {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
+        // Targeted Call Logic:
+        // If we have selected participants, we send to them specifically.
+        // Otherwise, it's a broadcast call to 'all'.
+        const targets = selectedCallParticipants.size > 0 ? Array.from(selectedCallParticipants) : 'all';
+
         chatSocket.send(JSON.stringify({
             'type': 'webrtc_signal',
             'data': offer,
-            'target_user': 'all'
+            'target_users': targets // Send either 'all' or an array of usernames
         }));
 
-        console.log("Call offer sent successfully!");
+        console.log(`Call offer sent successfully! Targets: ${targets}`);
+
+        // Clear selection after starting call
+        selectedCallParticipants.clear();
+        if (typeof updateUserListDisplay === 'function' && window.availableParticipants) {
+            updateUserListDisplay(window.availableParticipants);
+        }
+
         showCallInterface();
     } catch (err) {
         console.error("Could not start voice call:", err);

@@ -769,14 +769,15 @@ class ChatConsumer(WebsocketConsumer):
         
         #Webrtc
         elif message_type == 'webrtc_signal':
-            # target_user = text_data_json.get('target_user')
+            target_users = text_data_json.get('target_users', 'all')
             
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
-                    'type': 'webrtc_signal_handler', # Matches the function name below
+                    'type': 'webrtc_signal_handler', 
                     'data': text_data_json.get('data'),
-                    'sender': self.username
+                    'sender': self.username,
+                    'target_users': target_users
                 }
             )
     
@@ -784,18 +785,32 @@ class ChatConsumer(WebsocketConsumer):
     def webrtc_signal_handler(self, event):
         """
         Sends signaling data (offers, answers, ICE) to the client.
-        Crucial: It filters out the sender so they don't receive their own signal.
+        Crucial: It filters out the sender so they don't receive their own signal,
+        and also filters based on target_users.
         """
         # Skip if the message is coming back to the person who sent it
         if self.username == event['sender']:
             return
 
-        # Send signal to the client
-        self.send(text_data=json.dumps({
-            'type': 'webrtc_signal',
-            'data': event['data'],
-            'sender': event['sender']
-        }))
+        # Targeted Signaling Logic
+        target_users = event.get('target_users', 'all')
+        
+        # Only send if it's a broadcast or if this specific consumer is in the target list
+        should_send = False
+        if target_users == 'all':
+            should_send = True
+        elif isinstance(target_users, list) and self.username in target_users:
+            should_send = True
+        elif isinstance(target_users, str) and self.username == target_users:
+            should_send = True
+
+        if should_send:
+            # Send signal to the client
+            self.send(text_data=json.dumps({
+                'type': 'webrtc_signal',
+                'data': event['data'],
+                'sender': event['sender']
+            }))
 
 
     # def webrtc_signal_handler(self, event):

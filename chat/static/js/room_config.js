@@ -75,6 +75,7 @@ let typingUsers = new Set();
 let isAwaitingServerSync = false;
 let isFatalError = false; // Flag to halt generic reconnect/load processes
 let pickerOpen = false;
+let selectedCallParticipants = new Set();
 
 // Ensure global accessibility
 window.availableParticipants = [];
