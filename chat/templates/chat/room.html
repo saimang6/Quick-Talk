@@ -261,6 +261,16 @@
                         </svg>
                     </button>
 
+                    <button id="video-call-btn"
+                        class="flex items-center justify-center p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg shadow-emerald-500/30 transition-all duration-200 active:scale-95"
+                        title="Start Video Call (Select participants in sidebar to call individuals)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+
                     <button id="hamburger-menu-btn"
                         class="flex items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg border border-slate-700 transition-all duration-200 active:scale-95 shadow-md"
                         aria-label="Toggle user list">
@@ -595,6 +605,70 @@
                         <i class="fas fa-phone"></i>
                     </button>
                     <button id="deny-call-btn" class="call-btn danger" title="Deny Call">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVE VIDEO CALL INTERFACE OVERLAY -->
+    <div id="video-call-overlay" class="video-call-overlay hidden">
+        <div class="video-call-content">
+            <!-- Minimize Button -->
+            <button id="minimize-video-call-btn" class="minimize-call-btn" title="Minimize Video Call">
+                <i class="fas fa-compress-alt"></i>
+            </button>
+
+            <!-- Video Grid Container -->
+            <div class="video-grid-container">
+                <!-- Remote Video (Large) -->
+                <div class="remote-video-wrapper">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <div class="video-placeholder" id="remote-video-placeholder">
+                        <div class="placeholder-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <p id="video-participant-name">Waiting for participant...</p>
+                    </div>
+                </div>
+
+                <!-- Local Video (Picture-in-Picture Style) -->
+                <div class="local-video-wrapper" id="local-video-wrapper">
+                    <video id="local-video" autoplay playsinline muted></video>
+                    <span class="local-video-label">You</span>
+                </div>
+            </div>
+
+            <!-- Video Call Info -->
+            <div class="video-call-info">
+                <h2 id="video-call-status-text">Ongoing Video Call</h2>
+                <div id="video-call-timer" class="call-timer">00:00</div>
+            </div>
+
+            <!-- Video Call Actions -->
+            <div id="video-call-actions-container" class="call-actions-container">
+                <!-- Ongoing Video Call Actions -->
+                <div id="ongoing-video-call-actions" class="call-actions-group">
+                    <button id="mute-video-call-btn" class="call-btn secondary" title="Mute Microphone">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+
+                    <button id="toggle-camera-btn" class="call-btn secondary" title="Toggle Camera">
+                        <i class="fas fa-video"></i>
+                    </button>
+
+                    <button id="hangup-video-call-btn" class="call-btn danger" title="End Video Call">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+
+                <!-- Incoming Video Call Actions -->
+                <div id="incoming-video-call-actions" class="call-actions-group hidden">
+                    <button id="accept-video-call-btn" class="call-btn success" title="Accept Video Call">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    <button id="deny-video-call-btn" class="call-btn danger" title="Deny Video Call">
                         <i class="fas fa-phone-slash"></i>
                     </button>
                 </div>

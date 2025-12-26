@@ -61,15 +61,20 @@ let localStream = null; // Track local audio stream for cleanup
 let iceCandidateQueue = []; // Queue for ICE candidates that arrive before remote description
 let pendingCallData = null; // Stores incoming offer while waiting for Accept/Deny
 
+// Video Call specific variables
+let isVideoCall = false; // Flag to differentiate video call from voice call
+let isCameraMuted = false; // Track camera on/off state
+let pendingVideoCallData = null; // Stores incoming video offer while waiting for Accept/Deny
+
 
 /**
- * Cleans up WebRTC resources (peer connection, audio elements, streams)
+ * Cleans up WebRTC resources (peer connection, audio/video elements, streams)
  * @param {boolean} keepQueue - If true, preserves the iceCandidateQueue (used during call setup phase)
  */
 function cleanupWebRTC(keepQueue = false) {
     console.log("Cleaning up WebRTC resources... (keepQueue: " + keepQueue + ")");
 
-    // 1. Stop all local audio tracks
+    // 1. Stop all local audio/video tracks
     if (localStream) {
         localStream.getTracks().forEach(track => {
             track.stop();
@@ -90,7 +95,7 @@ function cleanupWebRTC(keepQueue = false) {
     }
 
 
-    // 3. Remove and clear the remote audio element
+    // 4. Remove and clear the remote audio element (for voice calls)
     const remoteAudio = document.getElementById('remote-voip-audio');
     if (remoteAudio) {
         remoteAudio.pause();
@@ -98,9 +103,26 @@ function cleanupWebRTC(keepQueue = false) {
         remoteAudio.remove();
     }
 
-    // 4. Hide Call UI
+    // 5. Clear video elements (for video calls)
+    const remoteVideo = document.getElementById('remote-video');
+    const localVideo = document.getElementById('local-video');
+
+    if (remoteVideo) {
+        remoteVideo.srcObject = null;
+    }
+    if (localVideo) {
+        localVideo.srcObject = null;
+    }
+
+    // 6. Reset video call states
+    isVideoCall = false;
+    isCameraMuted = false;
+
+    // 7. Hide Call UIs (both voice and video)
     hideCallInterface();
+    hideVideoCallInterface();
 }
+
 
 /**
  * --- CALL UI MANAGEMENT ---
@@ -265,7 +287,185 @@ function stopCallTimer() {
     }
     const timerDisplay = document.getElementById('call-timer');
     if (timerDisplay) timerDisplay.textContent = "00:00";
+
+    // Also reset video call timer
+    const videoTimerDisplay = document.getElementById('video-call-timer');
+    if (videoTimerDisplay) videoTimerDisplay.textContent = "00:00";
 }
+
+// ===================================================================
+// VIDEO CALL UI MANAGEMENT
+// ===================================================================
+
+let videoCallTimerInterval = null;
+let videoCallStartTime = null;
+
+/**
+ * Shows the video call interface overlay.
+ * @param {boolean} isIncoming - Whether this is an incoming call (shows Accept/Deny) 
+ */
+function showVideoCallInterface(isIncoming = false) {
+    const overlay = document.getElementById('video-call-overlay');
+    const ongoingActions = document.getElementById('ongoing-video-call-actions');
+    const incomingActions = document.getElementById('incoming-video-call-actions');
+    const statusText = document.getElementById('video-call-status-text');
+    const placeholder = document.getElementById('remote-video-placeholder');
+
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        resetVideoCallUIStates();
+
+        if (isIncoming) {
+            if (ongoingActions) ongoingActions.classList.add('hidden');
+            if (incomingActions) incomingActions.classList.remove('hidden');
+            if (statusText) statusText.textContent = "Incoming Video Call";
+            if (placeholder) placeholder.classList.remove('hidden');
+            stopVideoCallTimer();
+        } else {
+            if (ongoingActions) ongoingActions.classList.remove('hidden');
+            if (incomingActions) incomingActions.classList.add('hidden');
+            if (statusText) statusText.textContent = "Ongoing Video Call";
+            startVideoCallTimer();
+        }
+    }
+}
+
+function hideVideoCallInterface() {
+    const overlay = document.getElementById('video-call-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('minimized');
+        const miniBtn = document.getElementById('minimize-video-call-btn');
+        if (miniBtn) miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
+        stopVideoCallTimer();
+    }
+}
+
+function resetVideoCallUIStates() {
+    isCameraMuted = false;
+
+    const cameraBtn = document.getElementById('toggle-camera-btn');
+    const muteBtn = document.getElementById('mute-video-call-btn');
+
+    if (cameraBtn) {
+        cameraBtn.classList.remove('active');
+        cameraBtn.innerHTML = '<i class="fas fa-video"></i>';
+        cameraBtn.title = "Turn Off Camera";
+    }
+
+    if (muteBtn) {
+        muteBtn.classList.remove('active');
+        muteBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+        muteBtn.title = "Mute Microphone";
+    }
+}
+
+function toggleCamera() {
+    if (!localStream) return;
+
+    isCameraMuted = !isCameraMuted;
+    const videoTracks = localStream.getVideoTracks();
+
+    videoTracks.forEach(track => {
+        track.enabled = !isCameraMuted;
+    });
+
+    const cameraBtn = document.getElementById('toggle-camera-btn');
+    const localVideoWrapper = document.getElementById('local-video-wrapper');
+
+    if (cameraBtn) {
+        if (isCameraMuted) {
+            cameraBtn.classList.add('active');
+            cameraBtn.innerHTML = '<i class="fas fa-video-slash"></i>';
+            cameraBtn.title = "Turn On Camera";
+        } else {
+            cameraBtn.classList.remove('active');
+            cameraBtn.innerHTML = '<i class="fas fa-video"></i>';
+            cameraBtn.title = "Turn Off Camera";
+        }
+    }
+
+    if (localVideoWrapper) {
+        localVideoWrapper.classList.toggle('camera-off', isCameraMuted);
+    }
+
+    console.log("Camera " + (isCameraMuted ? "off" : "on"));
+}
+
+function toggleVideoCallMic() {
+    if (!localStream) return;
+
+    isMicMuted = !isMicMuted;
+    const audioTracks = localStream.getAudioTracks();
+
+    audioTracks.forEach(track => {
+        track.enabled = !isMicMuted;
+    });
+
+    const muteBtn = document.getElementById('mute-video-call-btn');
+    if (muteBtn) {
+        if (isMicMuted) {
+            muteBtn.classList.add('active');
+            muteBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+            muteBtn.title = "Unmute Microphone";
+        } else {
+            muteBtn.classList.remove('active');
+            muteBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            muteBtn.title = "Mute Microphone";
+        }
+    }
+
+    console.log("Video call mic " + (isMicMuted ? "muted" : "unmuted"));
+}
+
+function toggleMinimizeVideoCall() {
+    const overlay = document.getElementById('video-call-overlay');
+    const miniBtn = document.getElementById('minimize-video-call-btn');
+
+    if (overlay) {
+        const isMinimized = overlay.classList.toggle('minimized');
+
+        if (miniBtn) {
+            if (isMinimized) {
+                miniBtn.innerHTML = '<i class="fas fa-expand-alt"></i>';
+                miniBtn.title = "Expand Video Call";
+            } else {
+                miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
+                miniBtn.title = "Minimize Video Call";
+            }
+        }
+
+        console.log("Video call interface " + (isMinimized ? "minimized" : "expanded"));
+    }
+}
+
+function startVideoCallTimer() {
+    videoCallStartTime = Date.now();
+    const timerDisplay = document.getElementById('video-call-timer');
+
+    if (videoCallTimerInterval) clearInterval(videoCallTimerInterval);
+
+    videoCallTimerInterval = setInterval(() => {
+        const delta = Date.now() - videoCallStartTime;
+        const totalSeconds = Math.floor(delta / 1000);
+        const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+        if (timerDisplay) {
+            timerDisplay.textContent = `${minutes}:${seconds}`;
+        }
+    }, 1000);
+}
+
+function stopVideoCallTimer() {
+    if (videoCallTimerInterval) {
+        clearInterval(videoCallTimerInterval);
+        videoCallTimerInterval = null;
+    }
+    const timerDisplay = document.getElementById('video-call-timer');
+    if (timerDisplay) timerDisplay.textContent = "00:00";
+}
+
 
 // Global listener for Call UI buttons
 document.addEventListener('DOMContentLoaded', () => {
@@ -321,7 +521,63 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // ===================================================================
+    // VIDEO CALL BUTTON LISTENERS
+    // ===================================================================
+    const hangupVideoBtn = document.getElementById('hangup-video-call-btn');
+    const muteVideoBtn = document.getElementById('mute-video-call-btn');
+    const toggleCameraBtn = document.getElementById('toggle-camera-btn');
+    const minimizeVideoBtn = document.getElementById('minimize-video-call-btn');
+
+    // Accept/Deny buttons for video call
+    const acceptVideoBtn = document.getElementById('accept-video-call-btn');
+    const denyVideoBtn = document.getElementById('deny-video-call-btn');
+
+    if (hangupVideoBtn) {
+        hangupVideoBtn.addEventListener('click', () => {
+            console.log("Video call hangup requested by user.");
+            cleanupWebRTC();
+            displayMessage('System', '🚫 You left the video call.', 'video-left-' + Date.now());
+        });
+    }
+
+    if (muteVideoBtn) {
+        muteVideoBtn.addEventListener('click', toggleVideoCallMic);
+    }
+
+    if (toggleCameraBtn) {
+        toggleCameraBtn.addEventListener('click', toggleCamera);
+    }
+
+    if (minimizeVideoBtn) {
+        minimizeVideoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMinimizeVideoCall();
+        });
+    }
+
+    if (acceptVideoBtn) {
+        acceptVideoBtn.addEventListener('click', acceptVideoCall);
+    }
+
+    if (denyVideoBtn) {
+        denyVideoBtn.addEventListener('click', denyVideoCall);
+    }
+
+    // Expand when clicking the minimized video call (but not its buttons)
+    const videoCallOverlay = document.getElementById('video-call-overlay');
+    if (videoCallOverlay) {
+        videoCallOverlay.addEventListener('click', (e) => {
+            if (videoCallOverlay.classList.contains('minimized')) {
+                if (!e.target.closest('.call-btn') && !e.target.closest('.minimize-call-btn')) {
+                    toggleMinimizeVideoCall();
+                }
+            }
+        });
+    }
 });
+
 
 async function createPeerConnection(preserveCandidates = false) {
     console.log("Initializing new RTCPeerConnection... (Preserve Candidates: " + preserveCandidates + ")");
@@ -341,17 +597,20 @@ async function createPeerConnection(preserveCandidates = false) {
         const state = peerConnection.iceConnectionState;
         console.log("ICE Connection State:", state);
 
+        const callType = isVideoCall ? 'Video' : 'Voice';
+        const emoji = isVideoCall ? '📹' : '🎙️';
+
         if (state === 'connected' || state === 'completed') {
-            displayMessage('System', '✅ Voice call connected!', 'voip-connected-' + Date.now());
+            displayMessage('System', `✅ ${callType} call connected!`, 'call-connected-' + Date.now());
         } else if (state === 'failed') {
-            displayMessage('System', '❌ Voice call failed. Attempting to restart...', 'voip-failed-' + Date.now());
+            displayMessage('System', `❌ ${callType} call failed. Attempting to restart...`, 'call-failed-' + Date.now());
             // Try ICE restart
             if (peerConnection && peerConnection.restartIce) {
                 console.log("Attempting ICE restart...");
                 peerConnection.restartIce();
             }
         } else if (state === 'disconnected') {
-            displayMessage('System', '⚠️ Voice call disconnected. Waiting for reconnection...', 'voip-disconnected-' + Date.now());
+            displayMessage('System', `⚠️ ${callType} call disconnected. Waiting for reconnection...`, 'call-disconnected-' + Date.now());
             // Wait a bit and check if it recovers, otherwise attempt restart
             setTimeout(() => {
                 if (peerConnection && peerConnection.iceConnectionState === 'disconnected') {
@@ -385,47 +644,89 @@ async function createPeerConnection(preserveCandidates = false) {
         }
     };
 
-    // 2. Listen for the remote audio stream
+    // 2. Listen for the remote audio/video stream
     peerConnection.ontrack = (event) => {
-        console.log("Incoming audio stream detected!", event.streams);
+        console.log("Incoming stream detected! Track kind:", event.track.kind);
 
-        // Remove any existing audio element first
-        let remoteAudio = document.getElementById('remote-voip-audio');
-        if (remoteAudio) {
-            remoteAudio.pause();
-            remoteAudio.srcObject = null;
-            remoteAudio.remove();
+        if (event.track.kind === 'video') {
+            // Handle incoming video track
+            console.log("Processing video track for video call...");
+
+            const remoteVideo = document.getElementById('remote-video');
+            const placeholder = document.getElementById('remote-video-placeholder');
+
+            if (remoteVideo) {
+                remoteVideo.srcObject = event.streams[0];
+
+                remoteVideo.play().then(() => {
+                    console.log("Remote video playing successfully!");
+                    if (placeholder) placeholder.classList.add('hidden');
+                }).catch(e => {
+                    console.warn("Video autoplay blocked:", e);
+                    displayMessage('System', '📹 Click anywhere to enable video.', Date.now());
+                    document.addEventListener('click', function resumeVideo() {
+                        remoteVideo.play();
+                        document.removeEventListener('click', resumeVideo);
+                    }, { once: true });
+                });
+            }
+
+            displayMessage('System', '📹 Video call connected!', 'video-connected-' + Date.now());
+            showVideoCallInterface();
+
+        } else if (event.track.kind === 'audio') {
+            // Handle audio track - check if this is a video call or voice-only call
+            if (isVideoCall) {
+                // For video calls, audio comes through the video element
+                console.log("Audio track received (video call - using video element)");
+                const remoteVideo = document.getElementById('remote-video');
+                if (remoteVideo && !remoteVideo.srcObject) {
+                    remoteVideo.srcObject = event.streams[0];
+                }
+            } else {
+                // Voice-only call - use audio element
+                console.log("Processing audio-only call...");
+
+                // Remove any existing audio element first
+                let remoteAudio = document.getElementById('remote-voip-audio');
+                if (remoteAudio) {
+                    remoteAudio.pause();
+                    remoteAudio.srcObject = null;
+                    remoteAudio.remove();
+                }
+
+                // Create a fresh audio element
+                remoteAudio = document.createElement('audio');
+                remoteAudio.id = 'remote-voip-audio';
+                document.body.appendChild(remoteAudio);
+
+                // Set attributes for mobile compatibility
+                remoteAudio.setAttribute('autoplay', 'true');
+                remoteAudio.setAttribute('playsinline', 'true');
+                remoteAudio.volume = 1.0; // Max volume
+                remoteAudio.srcObject = event.streams[0];
+
+                // CRITICAL: Manually trigger play to bypass browser silence policies
+                remoteAudio.play().then(() => {
+                    console.log("Remote audio playing successfully!");
+                }).catch(e => {
+                    console.warn("Autoplay blocked. User must click the page to hear audio.", e);
+                    displayMessage('System', '🔊 Click anywhere to enable call audio.', Date.now());
+
+                    // Add a one-time click listener to resume audio
+                    document.addEventListener('click', function resumeAudio() {
+                        remoteAudio.play();
+                        document.removeEventListener('click', resumeAudio);
+                    }, { once: true });
+                });
+
+                displayMessage('System', '🎙️ Voice call active.', 'voip-active-' + Date.now());
+                showCallInterface();
+            }
         }
-
-        // Create a fresh audio element
-        remoteAudio = document.createElement('audio');
-        remoteAudio.id = 'remote-voip-audio';
-        document.body.appendChild(remoteAudio);
-
-        // Set attributes for mobile compatibility
-        remoteAudio.setAttribute('autoplay', 'true');
-        remoteAudio.setAttribute('playsinline', 'true');
-        remoteAudio.volume = 1.0; // Max volume
-        remoteAudio.srcObject = event.streams[0];
-
-        // CRITICAL: Manually trigger play to bypass browser silence policies
-        remoteAudio.play().then(() => {
-            console.log("Remote audio playing successfully!");
-        }).catch(e => {
-            console.warn("Autoplay blocked. User must click the page to hear audio.", e);
-            displayMessage('System', '🔊 Click anywhere to enable call audio.', Date.now());
-
-            // Add a one-time click listener to resume audio
-            document.addEventListener('click', function resumeAudio() {
-                remoteAudio.play();
-                document.removeEventListener('click', resumeAudio);
-            }, { once: true });
-        });
-
-        displayMessage('System', '🎙️ Voice call active.', 'voip-active-' + Date.now());
-        showCallInterface();
     };
 }
+
 
 
 
@@ -975,18 +1276,35 @@ async function handleIncomingCall(offer, sender) {
     console.log("=== INCOMING CALL ===");
     console.log("Incoming call from:", sender);
 
-    // Save offer and sender for later acceptance
-    pendingCallData = { offer, sender };
+    // Detect if this is a video call by checking if offer contains video track
+    const hasVideo = offer.sdp && offer.sdp.includes('m=video');
+    console.log("Call type:", hasVideo ? "VIDEO" : "VOICE");
 
-    // Update UI and participant info
-    const participantName = document.getElementById('call-participant-name');
-    if (participantName) participantName.textContent = sender;
+    if (hasVideo) {
+        // This is a video call
+        pendingVideoCallData = { offer, sender };
+        isVideoCall = true;
 
-    // Show overlay in "Incoming" mode (Accept/Deny)
-    showCallInterface(true);
+        // Update UI and participant info
+        const participantName = document.getElementById('video-participant-name');
+        if (participantName) participantName.textContent = sender;
 
-    // Show notification that we're receiving a call
-    displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+        // Show video call overlay in "Incoming" mode
+        showVideoCallInterface(true);
+        displayMessage('System', `📹 Incoming video call from ${sender}...`, 'video-incoming-' + Date.now());
+    } else {
+        // This is a voice call
+        pendingCallData = { offer, sender };
+        isVideoCall = false;
+
+        // Update UI and participant info
+        const participantName = document.getElementById('call-participant-name');
+        if (participantName) participantName.textContent = sender;
+
+        // Show voice call overlay in "Incoming" mode
+        showCallInterface(true);
+        displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+    }
 }
 
 /**
@@ -1068,4 +1386,98 @@ function denyCall() {
     displayMessage('System', '❌ Call denied.', 'voip-denied-' + Date.now());
 }
 
+/**
+ * Logic to accept an incoming VIDEO call
+ */
+async function acceptVideoCall() {
+    if (!pendingVideoCallData) return;
+    const { offer, sender } = pendingVideoCallData;
+    pendingVideoCallData = null;
+
+    try {
+        console.log("Accepting VIDEO call from:", sender);
+        isVideoCall = true;
+
+        // Switch UI to "Ongoing" mode
+        showVideoCallInterface(false);
+
+        // Initialize the connection object
+        console.log("Step 1: Creating peer connection (preserving queued candidates)...");
+        await createPeerConnection(true);
+
+        // Get camera and microphone access
+        console.log("Step 2: Requesting camera and microphone access...");
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            },
+            audio: true
+        });
+
+        // Show local video preview
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play().catch(e => console.warn("Local video play blocked:", e));
+        }
+
+        // Add tracks to peer connection
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+            console.log("Step 2: Added track to peer connection:", track.kind);
+        });
+
+        console.log("Step 3: Setting remote description (offer)...");
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+        // Process any queued ICE candidates
+        console.log("Step 3.5: Processing", iceCandidateQueue.length, "queued ICE candidates...");
+        while (iceCandidateQueue.length > 0) {
+            const candidate = iceCandidateQueue.shift();
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+                console.error("Error adding queued ICE candidate:", err);
+            }
+        }
+
+        console.log("Step 4: Creating answer...");
+        const answer = await peerConnection.createAnswer();
+
+        console.log("Step 5: Setting local description (answer)...");
+        await peerConnection.setLocalDescription(answer);
+
+        console.log("Step 6: Sending answer to", sender);
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': answer,
+            'target_users': [sender]
+        }));
+
+        console.log("=== VIDEO CALL ACCEPTED AND CONNECTED ===");
+        displayMessage('System', '📹 Video call connected.', 'video-answering-' + Date.now());
+
+    } catch (err) {
+        console.error("=== FAILED TO ACCEPT VIDEO CALL ===");
+        console.error(err);
+        cleanupWebRTC();
+        displayMessage('System', '❌ Failed to connect video call: ' + err.message, 'video-error-' + Date.now());
+    }
+}
+
+/**
+ * Logic to deny an incoming VIDEO call
+ */
+function denyVideoCall() {
+    if (!pendingVideoCallData) return;
+    console.log("Denying video call from:", pendingVideoCallData.sender);
+
+    pendingVideoCallData = null;
+    isVideoCall = false;
+    cleanupWebRTC();
+
+    displayMessage('System', '❌ Video call denied.', 'video-denied-' + Date.now());
+}
 

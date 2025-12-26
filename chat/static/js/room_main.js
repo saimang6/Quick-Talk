@@ -132,6 +132,45 @@ if (voipCallBtn) {
     });
 }
 
+// --- VIDEO CALL BUTTON LISTENER ---
+const videoCallBtn = document.getElementById('video-call-btn');
+if (videoCallBtn) {
+    videoCallBtn.addEventListener('click', async () => {
+        try {
+            // Pre-request camera and microphone access while still in gesture context
+            console.log("Requesting camera and microphone access (for gesture context)...");
+            const testStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            // Immediately stop the test stream - we'll get a new one in startVideoCall
+            testStream.getTracks().forEach(track => track.stop());
+            console.log("Camera and microphone access granted!");
+
+            // Now show confirmation
+            const result = await Swal.fire({
+                title: 'Start Video Call? 📹',
+                text: "This will broadcast a video call invitation to selected participants (or everyone if none selected).",
+                icon: 'question',
+                iconColor: '#10b981',
+                showCancelButton: true,
+                confirmButtonText: 'Start Video Call',
+                confirmButtonColor: '#10b981',
+                cancelButtonText: 'Cancel'
+            });
+
+            if (result.isConfirmed) {
+                startVideoCall();
+            }
+        } catch (err) {
+            console.error("Camera/Microphone access denied:", err);
+            Swal.fire({
+                title: 'Camera & Microphone Required',
+                text: 'Please allow camera and microphone access to use video calls.',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+}
+
 
 window.addEventListener('pageshow', (event) => {
     // Check for BFcache restore AND confirm we are the owner
@@ -453,5 +492,67 @@ async function startVoiceCall() {
     } catch (err) {
         console.error("Could not start voice call:", err);
         Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');
+    }
+}
+
+/**
+ * Start a VIDEO CALL with selected participants or everyone
+ */
+async function startVideoCall() {
+    console.log("Starting WebRTC Video Call...");
+    try {
+        isVideoCall = true;
+
+        // Initialize the connection object first
+        await createPeerConnection();
+
+        // Get camera and microphone access
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            },
+            audio: true
+        });
+
+        // Show local video preview
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play().catch(e => console.warn("Local video play blocked:", e));
+        }
+
+        // Ensure tracks are added BEFORE createOffer
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+            console.log("Added track:", track.kind);
+        });
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        // Targeted Call Logic:
+        const targets = selectedCallParticipants.size > 0 ? Array.from(selectedCallParticipants) : 'all';
+
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': offer,
+            'target_users': targets
+        }));
+
+        console.log(`Video call offer sent successfully! Targets: ${targets}`);
+
+        // Clear selection after starting call
+        selectedCallParticipants.clear();
+        if (typeof updateUserListDisplay === 'function' && window.availableParticipants) {
+            updateUserListDisplay(window.availableParticipants);
+        }
+
+        showVideoCallInterface();
+    } catch (err) {
+        console.error("Could not start video call:", err);
+        isVideoCall = false;
+        Swal.fire('Video Call Error', 'Failed to start video call. Please check camera/microphone access.', 'error');
     }
 }

@@ -214,7 +214,8 @@ body.no-scroll {
 }
 
 .voip-hamburger-container {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     justify-content: space-between;
     align-items: start;
     gap: 10px;
@@ -1980,5 +1981,362 @@ emoji-picker {
     #scroll-to-bottom-btn svg {
         width: 20px;
         height: 20px;
+    }
+}
+
+/* ========================================================= */
+/* --- VIDEO CALL INTERFACE STYLES (PREMIUM) --- */
+/* ========================================================= */
+
+.video-call-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    color: white;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-call-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(1.1);
+}
+
+.video-call-overlay.minimized {
+    width: 180px;
+    height: 240px;
+    top: auto;
+    right: 16px;
+    left: auto;
+    bottom: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(16px);
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 100000;
+    transform: none;
+}
+
+.video-call-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.video-call-overlay.minimized .video-call-content {
+    padding: 0;
+    gap: 0.5rem;
+}
+
+/* Video Grid Container */
+.video-grid-container {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    max-height: calc(100vh - 200px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.video-call-overlay.minimized .video-grid-container {
+    max-height: none;
+    height: 100%;
+}
+
+/* Remote Video */
+.remote-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 900px;
+    aspect-ratio: 16 / 9;
+    background: #1f2937;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.video-call-overlay.minimized .remote-video-wrapper {
+    border-radius: 12px;
+    aspect-ratio: auto;
+    width: 100%;
+    height: calc(100% - 50px);
+}
+
+#remote-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #0f172a;
+}
+
+/* Video Placeholder (shown when no video) */
+.video-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+    gap: 1rem;
+}
+
+.video-placeholder.hidden {
+    display: none;
+}
+
+.placeholder-avatar {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    box-shadow: 0 0 30px rgba(79, 70, 229, 0.4);
+}
+
+.video-call-overlay.minimized .placeholder-avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+}
+
+.video-placeholder p {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.video-call-overlay.minimized .video-placeholder p {
+    font-size: 0.7rem;
+}
+
+/* Local Video (PiP Style) */
+.local-video-wrapper {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 180px;
+    height: 135px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    z-index: 10;
+    cursor: grab;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.local-video-wrapper:hover {
+    transform: scale(1.03);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    border-color: rgba(79, 70, 229, 0.5);
+}
+
+.video-call-overlay.minimized .local-video-wrapper {
+    display: none;
+}
+
+#local-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #0f172a;
+    transform: scaleX(-1);
+    /* Mirror for natural selfie view */
+}
+
+.local-video-label {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: white;
+    font-weight: 500;
+}
+
+/* Video Call Info */
+.video-call-info {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.video-call-overlay.minimized .video-call-info {
+    display: none;
+}
+
+.video-call-info h2 {
+    font-size: 1.4rem;
+    margin: 0;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+/* Video Call Actions - Bottom Bar Style */
+.video-call-overlay .call-actions-container {
+    margin-top: 0;
+    padding: 12px 24px;
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.video-call-overlay.minimized .call-actions-container {
+    width: 100%;
+    padding: 6px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.video-call-overlay.minimized .call-actions-group {
+    gap: 0.5rem;
+}
+
+.video-call-overlay.minimized .call-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
+}
+
+.video-call-overlay.minimized .call-btn.danger {
+    width: 36px;
+    height: 36px;
+}
+
+/* Minimize Button positioning for video call */
+.video-call-overlay .minimize-call-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100001;
+    transition: all 0.2s;
+    backdrop-filter: blur(4px);
+}
+
+.video-call-overlay .minimize-call-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.video-call-overlay.minimized .minimize-call-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+}
+
+/* Camera Off State */
+.local-video-wrapper.camera-off::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.local-video-wrapper.camera-off::before {
+    content: '\f03d';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: #ef4444;
+    z-index: 2;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .video-call-content {
+        padding: 10px;
+        gap: 1rem;
+    }
+
+    .video-grid-container {
+        max-height: calc(100vh - 180px);
+    }
+
+    .remote-video-wrapper {
+        border-radius: 16px;
+    }
+
+    .local-video-wrapper {
+        width: 120px;
+        height: 90px;
+        bottom: 10px;
+        right: 10px;
+        border-radius: 10px;
+    }
+
+    .placeholder-avatar {
+        width: 70px;
+        height: 70px;
+        font-size: 1.8rem;
+    }
+
+    .video-call-info h2 {
+        font-size: 1.1rem;
+    }
+
+    .video-call-overlay .call-actions-container {
+        padding: 10px 16px;
+    }
+
+    .video-call-overlay.minimized {
+        width: 140px;
+        height: 200px;
+        right: 10px;
+        bottom: 10px;
     }
 }
