@@ -204,14 +204,14 @@ body.no-scroll {
 }
 
 /* Right: Leave Button */
-.leave-container {
+/* .leave-container {
     height: 100%;
     min-height: 60px;
     display: flex;
     flex-direction: column-reverse;
     justify-content: space-between;
     align-items: end;
-}
+} */
 
 .voip-hamburger-container {
     display: grid;
@@ -221,8 +221,7 @@ body.no-scroll {
     gap: 10px;
 }
 
-.leave-button {
-    width: 100%;
+/* .leave-button {
     padding: 0.5rem 1rem;
     margin-top: 10px;
     background-color: #EF4444;
@@ -233,13 +232,12 @@ body.no-scroll {
     cursor: pointer;
     transition: background-color 0.2s;
     font-size: 0.875rem;
-    flex-shrink: 0;
 }
 
 .leave-button:hover {
     background-color: #DC2626;
     box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
-}
+} */
 
 /* NEW: Hamburger Button (Hidden by default on desktop) */
 .hamburger-button {
@@ -682,9 +680,9 @@ body.no-scroll {
         font-size: 1.4rem;
     }
 
-    .leave-button {
+    /* .leave-button {
         margin-top: 0px;
-    }
+    } */
 
     .creator-info {
         font-size: 0.7rem;
@@ -794,9 +792,9 @@ body.no-scroll {
         padding: 0.4rem 0.6rem;
     }
 
-    .leave-button {
+    /* .leave-button {
         margin-top: 20px;
-    }
+    } */
 
     .hamburger-button {
         margin-top: 3px;
@@ -1985,7 +1983,7 @@ emoji-picker {
 }
 
 /* ========================================================= */
-/* --- VIDEO CALL INTERFACE STYLES (PREMIUM) --- */
+/* --- VIDEO CALL INTERFACE STYLES (MULTI-PARTICIPANT) --- */
 /* ========================================================= */
 
 .video-call-overlay {
@@ -2010,8 +2008,8 @@ emoji-picker {
 }
 
 .video-call-overlay.minimized {
-    width: 180px;
-    height: 240px;
+    width: 200px;
+    height: 150px;
     top: auto;
     right: 16px;
     left: auto;
@@ -2030,11 +2028,11 @@ emoji-picker {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1rem;
     width: 100%;
     height: 100%;
     max-width: 100%;
-    padding: 20px;
+    padding: 60px 20px 20px;
     box-sizing: border-box;
     transition: all 0.3s ease;
 }
@@ -2044,143 +2042,229 @@ emoji-picker {
     gap: 0.5rem;
 }
 
-/* Video Grid Container */
-.video-grid-container {
-    position: relative;
+/* Participant Count Badge */
+.video-call-participant-count {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(79, 70, 229, 0.8);
+    backdrop-filter: blur(8px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 10;
+}
+
+.video-call-participant-count i {
+    font-size: 0.85rem;
+}
+
+.video-call-overlay.minimized .video-call-participant-count {
+    display: none;
+}
+
+/* ========================================================= */
+/* --- DYNAMIC VIDEO GRID --- */
+/* ========================================================= */
+
+.video-grid {
+    display: grid;
+    gap: 12px;
     width: 100%;
     flex: 1;
+    padding: 10px;
+    box-sizing: border-box;
     max-height: calc(100vh - 200px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+
+    /* Default: 1 participant */
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
 }
 
-.video-call-overlay.minimized .video-grid-container {
-    max-height: none;
-    height: 100%;
+/* 2 participants - side by side */
+.video-grid.participants-2 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: 1fr;
 }
 
-/* Remote Video */
-.remote-video-wrapper {
+/* 3-4 participants - 2x2 grid */
+.video-grid.participants-3,
+.video-grid.participants-4 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
+/* 5-6 participants - 3x2 grid */
+.video-grid.participants-5,
+.video-grid.participants-6 {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
+/* 7+ participants - 3x3 grid with scroll */
+.video-grid.participants-many {
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(180px, 1fr);
+    overflow-y: auto;
+}
+
+.video-call-overlay.minimized .video-grid {
+    max-height: calc(100% - 50px);
+    gap: 4px;
+    padding: 4px;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+/* ========================================================= */
+/* --- VIDEO TILE STYLES --- */
+/* ========================================================= */
+
+.video-tile {
     position: relative;
-    width: 100%;
-    height: 100%;
-    max-width: 900px;
-    aspect-ratio: 16 / 9;
     background: #1f2937;
-    border-radius: 20px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    min-height: 120px;
 }
 
-.video-call-overlay.minimized .remote-video-wrapper {
-    border-radius: 12px;
-    aspect-ratio: auto;
-    width: 100%;
-    height: calc(100% - 50px);
+.video-tile:hover {
+    border-color: rgba(79, 70, 229, 0.5);
+    box-shadow: 0 12px 40px rgba(79, 70, 229, 0.2);
 }
 
-#remote-video {
+.video-tile.local-tile {
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.video-tile.local-tile:hover {
+    border-color: rgba(16, 185, 129, 0.8);
+}
+
+.video-tile video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     background: #0f172a;
 }
 
-/* Video Placeholder (shown when no video) */
-.video-placeholder {
+.video-tile.local-tile video {
+    transform: scaleX(-1);
+    /* Mirror local video for natural selfie view */
+}
+
+/* Video Tile Overlay (name + status) */
+.video-tile-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.video-tile-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    max-width: 70%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.video-tile-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.video-tile-status i {
+    font-size: 0.75rem;
+    color: #10b981;
+}
+
+.video-tile-status i.muted {
+    color: #ef4444;
+}
+
+/* Connecting/Placeholder state for remote tiles */
+.video-tile.connecting::before {
+    content: '';
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    right: 0;
+    bottom: 0;
     background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-    gap: 1rem;
-}
-
-.video-placeholder.hidden {
-    display: none;
-}
-
-.placeholder-avatar {
-    width: 100px;
-    height: 100px;
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.5rem;
-    box-shadow: 0 0 30px rgba(79, 70, 229, 0.4);
+    z-index: 1;
 }
 
-.video-call-overlay.minimized .placeholder-avatar {
-    width: 50px;
-    height: 50px;
-    font-size: 1.2rem;
-}
-
-.video-placeholder p {
+.video-tile.connecting::after {
+    content: '\f110';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
     color: #94a3b8;
-    font-size: 1.1rem;
-    margin: 0;
+    z-index: 2;
+    animation: spin 1s linear infinite;
 }
 
-.video-call-overlay.minimized .video-placeholder p {
-    font-size: 0.7rem;
+@keyframes spin {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
 }
 
-/* Local Video (PiP Style) */
-.local-video-wrapper {
+/* Camera off state */
+.video-tile.camera-off video {
+    opacity: 0;
+}
+
+.video-tile.camera-off::before {
+    content: '';
     position: absolute;
-    bottom: 16px;
-    right: 16px;
-    width: 180px;
-    height: 135px;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    border: 3px solid rgba(255, 255, 255, 0.15);
-    z-index: 10;
-    cursor: grab;
-    transition: transform 0.2s, box-shadow 0.2s;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    z-index: 1;
 }
 
-.local-video-wrapper:hover {
-    transform: scale(1.03);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-    border-color: rgba(79, 70, 229, 0.5);
-}
-
-.video-call-overlay.minimized .local-video-wrapper {
-    display: none;
-}
-
-#local-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: #0f172a;
-    transform: scaleX(-1);
-    /* Mirror for natural selfie view */
-}
-
-.local-video-label {
+.video-tile.camera-off::after {
+    content: '\f03d';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
     position: absolute;
-    bottom: 8px;
-    left: 8px;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    color: white;
-    font-weight: 500;
+    top: calc(50% - 20px);
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.5rem;
+    color: #4b5563;
+    z-index: 2;
 }
 
 /* Video Call Info */
@@ -2189,7 +2273,7 @@ emoji-picker {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
 }
 
 .video-call-overlay.minimized .video-call-info {
@@ -2197,7 +2281,7 @@ emoji-picker {
 }
 
 .video-call-info h2 {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     margin: 0;
     font-weight: 700;
     color: #f1f5f9;
@@ -2225,14 +2309,14 @@ emoji-picker {
 }
 
 .video-call-overlay.minimized .call-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 0.9rem;
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
 }
 
 .video-call-overlay.minimized .call-btn.danger {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
 }
 
 /* Minimize Button positioning for video call */
@@ -2262,71 +2346,72 @@ emoji-picker {
 
 .video-call-overlay.minimized .minimize-call-btn {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 28px;
-    height: 28px;
-    font-size: 0.7rem;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    font-size: 0.6rem;
 }
 
-/* Camera Off State */
-.local-video-wrapper.camera-off::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #1f2937;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+/* ========================================================= */
+/* --- MOBILE RESPONSIVE --- */
+/* ========================================================= */
 
-.local-video-wrapper.camera-off::before {
-    content: '\f03d';
-    font-family: 'Font Awesome 5 Free';
-    font-weight: 900;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.5rem;
-    color: #ef4444;
-    z-index: 2;
-}
-
-/* Mobile Responsive */
 @media (max-width: 768px) {
     .video-call-content {
-        padding: 10px;
-        gap: 1rem;
+        padding: 50px 10px 10px;
+        gap: 0.75rem;
     }
 
-    .video-grid-container {
-        max-height: calc(100vh - 180px);
+    .video-grid {
+        gap: 8px;
+        max-height: calc(100vh - 160px);
     }
 
-    .remote-video-wrapper {
-        border-radius: 16px;
+    /* Mobile: 2 participants - stacked vertically */
+    .video-grid.participants-2 {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(2, 1fr);
     }
 
-    .local-video-wrapper {
-        width: 120px;
-        height: 90px;
-        bottom: 10px;
-        right: 10px;
-        border-radius: 10px;
+    /* Mobile: 3-4 participants - 2x2 grid */
+    .video-grid.participants-3,
+    .video-grid.participants-4 {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
     }
 
-    .placeholder-avatar {
-        width: 70px;
-        height: 70px;
-        font-size: 1.8rem;
+    /* Mobile: 5+ participants - 2x3 with scroll */
+    .video-grid.participants-5,
+    .video-grid.participants-6,
+    .video-grid.participants-many {
+        grid-template-columns: repeat(2, 1fr);
+        grid-auto-rows: minmax(120px, 1fr);
+        overflow-y: auto;
+    }
+
+    .video-tile {
+        border-radius: 12px;
+        min-height: 100px;
+    }
+
+    .video-tile-name {
+        font-size: 0.75rem;
+    }
+
+    .video-tile-overlay {
+        padding: 8px;
+    }
+
+    .video-call-participant-count {
+        top: 10px;
+        left: 10px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
     }
 
     .video-call-info h2 {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .video-call-overlay .call-actions-container {
@@ -2335,8 +2420,28 @@ emoji-picker {
 
     .video-call-overlay.minimized {
         width: 140px;
-        height: 200px;
+        height: 120px;
         right: 10px;
         bottom: 10px;
+    }
+
+    .video-call-overlay .minimize-call-btn {
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .video-grid.participants-3,
+    .video-grid.participants-4,
+    .video-grid.participants-5,
+    .video-grid.participants-6,
+    .video-grid.participants-many {
+        grid-template-columns: 1fr;
+        grid-auto-rows: minmax(100px, 150px);
+        overflow-y: auto;
     }
 }

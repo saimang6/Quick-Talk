@@ -66,6 +66,11 @@ let isVideoCall = false; // Flag to differentiate video call from voice call
 let isCameraMuted = false; // Track camera on/off state
 let pendingVideoCallData = null; // Stores incoming video offer while waiting for Accept/Deny
 
+// Multi-peer connection support for group calls
+let peerConnections = new Map(); // Map of peerId (username) -> RTCPeerConnection
+let iceCandidateQueues = new Map(); // Map of peerId -> array of ICE candidates
+let videoCallParticipants = new Set(); // Track active video call participants
+
 
 /**
  * Cleans up WebRTC resources (peer connection, audio/video elements, streams)
@@ -83,17 +88,24 @@ function cleanupWebRTC(keepQueue = false) {
         localStream = null;
     }
 
-    // 2. Close existing peer connection
+    // 2. Close existing single peer connection (for voice calls)
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
     }
 
-    // 3. Clear ICE candidate queue unless requested otherwise
+    // 2b. Close all peer connections in the map (for group video calls)
+    peerConnections.forEach((pc, peerId) => {
+        console.log("Closing peer connection for:", peerId);
+        pc.close();
+    });
+    peerConnections.clear();
+
+    // 3. Clear ICE candidate queues
     if (!keepQueue) {
         iceCandidateQueue = [];
+        iceCandidateQueues.clear();
     }
-
 
     // 4. Remove and clear the remote audio element (for voice calls)
     const remoteAudio = document.getElementById('remote-voip-audio');
@@ -103,22 +115,26 @@ function cleanupWebRTC(keepQueue = false) {
         remoteAudio.remove();
     }
 
-    // 5. Clear video elements (for video calls)
-    const remoteVideo = document.getElementById('remote-video');
+    // 5. Clear local video element
     const localVideo = document.getElementById('local-video');
-
-    if (remoteVideo) {
-        remoteVideo.srcObject = null;
-    }
     if (localVideo) {
         localVideo.srcObject = null;
     }
 
-    // 6. Reset video call states
+    // 6. Remove all dynamically created remote video tiles
+    const videoGrid = document.getElementById('video-grid');
+    if (videoGrid) {
+        const remoteTiles = videoGrid.querySelectorAll('.video-tile:not(.local-tile)');
+        remoteTiles.forEach(tile => tile.remove());
+    }
+
+    // 7. Reset video call states
     isVideoCall = false;
     isCameraMuted = false;
+    videoCallParticipants.clear();
+    updateVideoGridLayout();
 
-    // 7. Hide Call UIs (both voice and video)
+    // 8. Hide Call UIs (both voice and video)
     hideCallInterface();
     hideVideoCallInterface();
 }
@@ -304,22 +320,24 @@ let videoCallStartTime = null;
  * Shows the video call interface overlay.
  * @param {boolean} isIncoming - Whether this is an incoming call (shows Accept/Deny) 
  */
+
 function showVideoCallInterface(isIncoming = false) {
     const overlay = document.getElementById('video-call-overlay');
     const ongoingActions = document.getElementById('ongoing-video-call-actions');
     const incomingActions = document.getElementById('incoming-video-call-actions');
     const statusText = document.getElementById('video-call-status-text');
-    const placeholder = document.getElementById('remote-video-placeholder');
 
     if (overlay) {
         overlay.classList.remove('hidden');
         resetVideoCallUIStates();
 
+        // Update grid layout to ensure local tile is shown correctly
+        updateVideoGridLayout();
+
         if (isIncoming) {
             if (ongoingActions) ongoingActions.classList.add('hidden');
             if (incomingActions) incomingActions.classList.remove('hidden');
             if (statusText) statusText.textContent = "Incoming Video Call";
-            if (placeholder) placeholder.classList.remove('hidden');
             stopVideoCallTimer();
         } else {
             if (ongoingActions) ongoingActions.classList.remove('hidden');
@@ -346,11 +364,16 @@ function resetVideoCallUIStates() {
 
     const cameraBtn = document.getElementById('toggle-camera-btn');
     const muteBtn = document.getElementById('mute-video-call-btn');
+    const localTile = document.getElementById('video-tile-local');
 
     if (cameraBtn) {
         cameraBtn.classList.remove('active');
         cameraBtn.innerHTML = '<i class="fas fa-video"></i>';
         cameraBtn.title = "Turn Off Camera";
+    }
+
+    if (localTile) {
+        localTile.classList.remove('camera-off');
     }
 
     if (muteBtn) {
@@ -371,7 +394,7 @@ function toggleCamera() {
     });
 
     const cameraBtn = document.getElementById('toggle-camera-btn');
-    const localVideoWrapper = document.getElementById('local-video-wrapper');
+    const localTile = document.getElementById('video-tile-local');
 
     if (cameraBtn) {
         if (isCameraMuted) {
@@ -385,12 +408,22 @@ function toggleCamera() {
         }
     }
 
-    if (localVideoWrapper) {
-        localVideoWrapper.classList.toggle('camera-off', isCameraMuted);
+    if (localTile) {
+        localTile.classList.toggle('camera-off', isCameraMuted);
+    }
+
+    // Also update mic status indicator
+    const localMicStatus = document.getElementById('local-mic-status');
+    if (localMicStatus) {
+        const icon = localMicStatus.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('muted', isMicMuted);
+        }
     }
 
     console.log("Camera " + (isCameraMuted ? "off" : "on"));
 }
+
 
 function toggleVideoCallMic() {
     if (!localStream) return;
@@ -464,6 +497,211 @@ function stopVideoCallTimer() {
     }
     const timerDisplay = document.getElementById('video-call-timer');
     if (timerDisplay) timerDisplay.textContent = "00:00";
+}
+
+// ===================================================================
+// VIDEO TILE MANAGEMENT FOR GROUP CALLS
+// ===================================================================
+
+/**
+ * Creates a new video tile for a remote participant
+ * @param {string} peerId - The username of the remote participant
+ * @returns {HTMLVideoElement} The video element inside the tile
+ */
+function createVideoTile(peerId) {
+    const videoGrid = document.getElementById('video-grid');
+    if (!videoGrid) return null;
+
+    // Check if tile already exists
+    let existingTile = document.getElementById(`video-tile-${peerId}`);
+    if (existingTile) {
+        return existingTile.querySelector('video');
+    }
+
+    // Create new video tile
+    const tile = document.createElement('div');
+    tile.className = 'video-tile connecting';
+    tile.id = `video-tile-${peerId}`;
+
+    const video = document.createElement('video');
+    video.id = `remote-video-${peerId}`;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'video-tile-overlay';
+    overlay.innerHTML = `
+        <span class="video-tile-name">${peerId}</span>
+        <span class="video-tile-status">
+            <i class="fas fa-microphone"></i>
+        </span>
+    `;
+
+    tile.appendChild(video);
+    tile.appendChild(overlay);
+    videoGrid.appendChild(tile);
+
+    // Update participant count and grid layout
+    videoCallParticipants.add(peerId);
+    updateVideoGridLayout();
+    updateParticipantCount();
+
+    console.log(`Created video tile for ${peerId}`);
+    return video;
+}
+
+/**
+ * Removes a video tile for a participant who left
+ * @param {string} peerId - The username of the participant
+ */
+function removeVideoTile(peerId) {
+    const tile = document.getElementById(`video-tile-${peerId}`);
+    if (tile) {
+        const video = tile.querySelector('video');
+        if (video) {
+            video.srcObject = null;
+        }
+        tile.remove();
+    }
+
+    // Close and remove peer connection for this user
+    if (peerConnections.has(peerId)) {
+        peerConnections.get(peerId).close();
+        peerConnections.delete(peerId);
+    }
+    iceCandidateQueues.delete(peerId);
+    videoCallParticipants.delete(peerId);
+
+    updateVideoGridLayout();
+    updateParticipantCount();
+
+    console.log(`Removed video tile for ${peerId}`);
+}
+
+/**
+ * Updates the video grid layout class based on number of participants
+ */
+function updateVideoGridLayout() {
+    const videoGrid = document.getElementById('video-grid');
+    if (!videoGrid) return;
+
+    const tileCount = videoGrid.querySelectorAll('.video-tile').length;
+
+    // Remove all participant classes
+    videoGrid.classList.remove(
+        'participants-2',
+        'participants-3',
+        'participants-4',
+        'participants-5',
+        'participants-6',
+        'participants-many'
+    );
+
+    // Add appropriate class based on count
+    if (tileCount === 2) {
+        videoGrid.classList.add('participants-2');
+    } else if (tileCount === 3) {
+        videoGrid.classList.add('participants-3');
+    } else if (tileCount === 4) {
+        videoGrid.classList.add('participants-4');
+    } else if (tileCount === 5) {
+        videoGrid.classList.add('participants-5');
+    } else if (tileCount === 6) {
+        videoGrid.classList.add('participants-6');
+    } else if (tileCount > 6) {
+        videoGrid.classList.add('participants-many');
+    }
+}
+
+/**
+ * Updates the participant count badge
+ */
+function updateParticipantCount() {
+    const countSpan = document.getElementById('video-participant-count');
+    if (countSpan) {
+        const videoGrid = document.getElementById('video-grid');
+        const count = videoGrid ? videoGrid.querySelectorAll('.video-tile').length : 0;
+        countSpan.textContent = count;
+    }
+}
+
+/**
+ * Creates a peer connection for a specific remote participant (for group calls)
+ * @param {string} peerId - The username of the remote participant
+ * @returns {RTCPeerConnection} The created peer connection
+ */
+async function createPeerConnectionForUser(peerId) {
+    console.log(`Creating peer connection for: ${peerId}`);
+
+    // Fetch TURN credentials
+    const config = await fetchTurnCredentials();
+
+    const pc = new RTCPeerConnection(config);
+
+    // Store in map
+    peerConnections.set(peerId, pc);
+
+    // Initialize ICE queue for this peer
+    if (!iceCandidateQueues.has(peerId)) {
+        iceCandidateQueues.set(peerId, []);
+    }
+
+    // ICE candidate handler - send to specific peer
+    pc.onicecandidate = (event) => {
+        if (event.candidate && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            console.log(`Sending ICE candidate to ${peerId}`);
+            chatSocket.send(JSON.stringify({
+                'type': 'webrtc_signal',
+                'data': { 'ice': event.candidate },
+                'target_users': [peerId]
+            }));
+        }
+    };
+
+    // ICE connection state handler
+    pc.oniceconnectionstatechange = () => {
+        if (!pc) return;
+        const state = pc.iceConnectionState;
+        console.log(`ICE state for ${peerId}:`, state);
+
+        const tile = document.getElementById(`video-tile-${peerId}`);
+
+        if (state === 'connected' || state === 'completed') {
+            if (tile) tile.classList.remove('connecting');
+        } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+            if (state === 'failed') {
+                displayMessage('System', `❌ Connection to ${peerId} failed.`, 'video-failed-' + Date.now());
+            }
+        }
+    };
+
+    // Track handler - receive remote stream
+    pc.ontrack = (event) => {
+        console.log(`Received track from ${peerId}:`, event.track.kind);
+
+        const tile = document.getElementById(`video-tile-${peerId}`);
+        if (tile) {
+            tile.classList.remove('connecting');
+        }
+
+        if (event.track.kind === 'video') {
+            const videoElement = document.getElementById(`remote-video-${peerId}`);
+            if (videoElement) {
+                videoElement.srcObject = event.streams[0];
+                videoElement.play().catch(e => console.warn(`Video play blocked for ${peerId}:`, e));
+            }
+        }
+    };
+
+    // Add local tracks if available
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            console.log(`Added ${track.kind} track to connection for ${peerId}`);
+        });
+    }
+
+    return pc;
 }
 
 
@@ -1216,13 +1454,34 @@ function handleSocketMessage(e) {
             }
 
             console.log("WebRTC Signal Received from:", data.sender);
+            const sender = data.sender;
 
             if (data.data.type === 'offer') {
-                handleIncomingCall(data.data, data.sender);
+                handleIncomingCall(data.data, sender);
             }
             else if (data.data.type === 'answer') {
-                // Set remote description if we are waiting for an answer
-                if (peerConnection && peerConnection.signalingState === "have-local-offer") {
+                // Check if this is a group video call (using peerConnections Map)
+                if (isVideoCall && peerConnections.has(sender)) {
+                    const pc = peerConnections.get(sender);
+                    if (pc && pc.signalingState === "have-local-offer") {
+                        pc.setRemoteDescription(new RTCSessionDescription(data.data))
+                            .then(() => {
+                                console.log(`Remote description set for ${sender}. Processing queued ICE candidates...`);
+
+                                // Process queued ICE candidates for this peer
+                                const queue = iceCandidateQueues.get(sender) || [];
+                                while (queue.length > 0) {
+                                    const candidate = queue.shift();
+                                    pc.addIceCandidate(new RTCIceCandidate(candidate))
+                                        .then(() => console.log(`Added queued ICE candidate for ${sender}`))
+                                        .catch(err => console.error(`Error adding ICE for ${sender}:`, err));
+                                }
+                            })
+                            .catch(err => console.error(`Error setting remote answer from ${sender}:`, err));
+                    }
+                }
+                // Fallback for voice calls (single peer connection)
+                else if (peerConnection && peerConnection.signalingState === "have-local-offer") {
                     peerConnection.setRemoteDescription(new RTCSessionDescription(data.data))
                         .then(() => {
                             console.log("Remote description set (answer). Processing queued ICE candidates...");
@@ -1248,20 +1507,43 @@ function handleSocketMessage(e) {
                 }
             }
             else if (data.data.ice) {
-                // If we have peer connection AND remote description, add ICE immediately
-                // Otherwise, queue it for later (even if peerConnection is null!)
-                if (peerConnection && peerConnection.remoteDescription) {
+                // Handle ICE candidate
+                // For group video calls, use the Map
+                if (isVideoCall && peerConnections.has(sender)) {
+                    const pc = peerConnections.get(sender);
+                    if (pc && pc.remoteDescription) {
+                        pc.addIceCandidate(new RTCIceCandidate(data.data.ice))
+                            .then(() => console.log(`Added ICE candidate from ${sender}`))
+                            .catch(err => console.error(`Error adding ICE from ${sender}:`, err));
+                    } else {
+                        // Queue for this specific peer
+                        if (!iceCandidateQueues.has(sender)) {
+                            iceCandidateQueues.set(sender, []);
+                        }
+                        iceCandidateQueues.get(sender).push(data.data.ice);
+                        console.log(`Queued ICE candidate for ${sender}`);
+                    }
+                }
+                // Fallback for voice calls or when peer connection exists in traditional mode
+                else if (peerConnection && peerConnection.remoteDescription) {
                     peerConnection.addIceCandidate(new RTCIceCandidate(data.data.ice))
                         .then(() => console.log("Added ICE candidate successfully"))
                         .catch(err => console.error("Error adding ICE candidate:", err));
                 } else {
-                    // CRITICAL FIX: Queue even when peerConnection is null (still being created)
+                    // Queue for later (traditional mode)
                     console.log("Queueing ICE candidate (peer connection or remote description not ready)");
                     iceCandidateQueue.push(data.data.ice);
+
+                    // Also queue per-sender for group calls
+                    if (!iceCandidateQueues.has(sender)) {
+                        iceCandidateQueues.set(sender, []);
+                    }
+                    iceCandidateQueues.get(sender).push(data.data.ice);
                 }
             }
 
             break;
+
 
 
         default:
@@ -1280,14 +1562,48 @@ async function handleIncomingCall(offer, sender) {
     const hasVideo = offer.sdp && offer.sdp.includes('m=video');
     console.log("Call type:", hasVideo ? "VIDEO" : "VOICE");
 
+    // Check if we are ALREADY in a video call - if so, add this person as a new participant
+    if (hasVideo && isVideoCall && localStream) {
+        console.log("Already in video call - adding new participant:", sender);
+
+        // Create a video tile for this new participant
+        createVideoTile(sender);
+
+        // Create peer connection for this participant
+        const pc = await createPeerConnectionForUser(sender);
+
+        // Set remote description (their offer)
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+        // Process any queued ICE candidates for this peer
+        const queue = iceCandidateQueues.get(sender) || [];
+        while (queue.length > 0) {
+            const candidate = queue.shift();
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+                console.error(`Error adding queued ICE for ${sender}:`, err);
+            }
+        }
+
+        // Create and send answer
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': answer,
+            'target_users': [sender]
+        }));
+
+        displayMessage('System', `📹 ${sender} joined the video call.`, 'video-join-' + Date.now());
+        return;
+    }
+
     if (hasVideo) {
-        // This is a video call
+        // This is a NEW video call
         pendingVideoCallData = { offer, sender };
         isVideoCall = true;
-
-        // Update UI and participant info
-        const participantName = document.getElementById('video-participant-name');
-        if (participantName) participantName.textContent = sender;
 
         // Show video call overlay in "Incoming" mode
         showVideoCallInterface(true);
@@ -1306,6 +1622,7 @@ async function handleIncomingCall(offer, sender) {
         displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
     }
 }
+
 
 /**
  * Logic to accept an incoming call
@@ -1401,12 +1718,7 @@ async function acceptVideoCall() {
         // Switch UI to "Ongoing" mode
         showVideoCallInterface(false);
 
-        // Initialize the connection object
-        console.log("Step 1: Creating peer connection (preserving queued candidates)...");
-        await createPeerConnection(true);
-
-        // Get camera and microphone access
-        console.log("Step 2: Requesting camera and microphone access...");
+        console.log("Step 1: Getting camera and microphone access...");
         localStream = await navigator.mediaDevices.getUserMedia({
             video: {
                 width: { ideal: 1280 },
@@ -1423,31 +1735,48 @@ async function acceptVideoCall() {
             localVideo.play().catch(e => console.warn("Local video play blocked:", e));
         }
 
-        // Add tracks to peer connection
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-            console.log("Step 2: Added track to peer connection:", track.kind);
-        });
+        // Update grid layout for initial participant count
+        updateVideoGridLayout();
+        updateParticipantCount();
 
+        // Create a video tile for the caller
+        createVideoTile(sender);
+
+        // Create peer connection for this specific caller
+        console.log("Step 2: Creating peer connection for caller...");
+        const pc = await createPeerConnectionForUser(sender);
+
+        // Set remote description (their offer)
         console.log("Step 3: Setting remote description (offer)...");
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-        // Process any queued ICE candidates
-        console.log("Step 3.5: Processing", iceCandidateQueue.length, "queued ICE candidates...");
-        while (iceCandidateQueue.length > 0) {
-            const candidate = iceCandidateQueue.shift();
+        // Process any queued ICE candidates for this peer
+        const queue = iceCandidateQueues.get(sender) || [];
+        console.log(`Step 3.5: Processing ${queue.length} queued ICE candidates for ${sender}...`);
+        while (queue.length > 0) {
+            const candidate = queue.shift();
             try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
             } catch (err) {
                 console.error("Error adding queued ICE candidate:", err);
             }
         }
 
+        // Also process legacy queue
+        while (iceCandidateQueue.length > 0) {
+            const candidate = iceCandidateQueue.shift();
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+                console.error("Error adding legacy queued ICE candidate:", err);
+            }
+        }
+
         console.log("Step 4: Creating answer...");
-        const answer = await peerConnection.createAnswer();
+        const answer = await pc.createAnswer();
 
         console.log("Step 5: Setting local description (answer)...");
-        await peerConnection.setLocalDescription(answer);
+        await pc.setLocalDescription(answer);
 
         console.log("Step 6: Sending answer to", sender);
         chatSocket.send(JSON.stringify({

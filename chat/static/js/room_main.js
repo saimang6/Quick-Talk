@@ -503,9 +503,6 @@ async function startVideoCall() {
     try {
         isVideoCall = true;
 
-        // Initialize the connection object first
-        await createPeerConnection();
-
         // Get camera and microphone access
         localStream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -523,25 +520,37 @@ async function startVideoCall() {
             localVideo.play().catch(e => console.warn("Local video play blocked:", e));
         }
 
-        // Ensure tracks are added BEFORE createOffer
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-            console.log("Added track:", track.kind);
-        });
+        // Determine targets
+        const targets = selectedCallParticipants.size > 0
+            ? Array.from(selectedCallParticipants)
+            : window.availableParticipants
+                ? window.availableParticipants.filter(u => u !== fixedUsername)
+                : [];
 
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
+        console.log("Video call targets:", targets);
 
-        // Targeted Call Logic:
-        const targets = selectedCallParticipants.size > 0 ? Array.from(selectedCallParticipants) : 'all';
+        // For each target participant, create a peer connection and send offer
+        for (const targetUser of targets) {
+            console.log(`Creating video call connection for: ${targetUser}`);
 
-        chatSocket.send(JSON.stringify({
-            'type': 'webrtc_signal',
-            'data': offer,
-            'target_users': targets
-        }));
+            // Create video tile for this participant
+            createVideoTile(targetUser);
 
-        console.log(`Video call offer sent successfully! Targets: ${targets}`);
+            // Create peer connection for this participant
+            const pc = await createPeerConnectionForUser(targetUser);
+
+            // Create and send offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            chatSocket.send(JSON.stringify({
+                'type': 'webrtc_signal',
+                'data': offer,
+                'target_users': [targetUser]
+            }));
+
+            console.log(`Sent video call offer to ${targetUser}`);
+        }
 
         // Clear selection after starting call
         selectedCallParticipants.clear();
@@ -549,7 +558,15 @@ async function startVideoCall() {
             updateUserListDisplay(window.availableParticipants);
         }
 
+        // Update grid layout
+        updateVideoGridLayout();
+        updateParticipantCount();
+
+        // Show video call interface
         showVideoCallInterface();
+
+        displayMessage('System', '📹 Starting video call...', 'video-start-' + Date.now());
+
     } catch (err) {
         console.error("Could not start video call:", err);
         isVideoCall = false;
