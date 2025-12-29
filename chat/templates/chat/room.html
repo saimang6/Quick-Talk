@@ -618,28 +618,28 @@
     <!-- ACTIVE VIDEO CALL INTERFACE OVERLAY -->
     <div id="video-call-overlay" class="video-call-overlay hidden">
         <div class="video-call-content">
+            <!-- Participant Count Badge -->
+            <div class="video-call-participant-count">
+                <i class="fas fa-users"></i>
+                <span id="video-participant-count">1</span>
+            </div>
+
             <!-- Minimize Button -->
             <button id="minimize-video-call-btn" class="minimize-call-btn" title="Minimize Video Call">
                 <i class="fas fa-compress-alt"></i>
             </button>
 
             <!-- Video Grid Container -->
-            <div class="video-grid-container">
-                <!-- Remote Video (Large) -->
-                <div class="remote-video-wrapper">
-                    <video id="remote-video" autoplay playsinline></video>
-                    <div class="video-placeholder" id="remote-video-placeholder">
-                        <div class="placeholder-avatar">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <p id="video-participant-name">Waiting for participant...</p>
-                    </div>
-                </div>
-
-                <!-- Local Video (Picture-in-Picture Style) -->
-                <div class="local-video-wrapper" id="local-video-wrapper">
+            <div id="video-grid" class="video-grid">
+                <!-- Local Video (As a Tile) -->
+                <div class="video-tile local-tile" id="video-tile-local">
                     <video id="local-video" autoplay playsinline muted></video>
-                    <span class="local-video-label">You</span>
+                    <div class="video-tile-overlay">
+                        <span class="video-tile-name">You</span>
+                        <span class="video-tile-status" id="local-mic-status">
+                            <i class="fas fa-microphone"></i>
+                        </span>
+                    </div>
                 </div>
             </div>
 

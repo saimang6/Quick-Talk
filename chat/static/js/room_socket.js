@@ -1788,6 +1788,9 @@ async function acceptVideoCall() {
         console.log("=== VIDEO CALL ACCEPTED AND CONNECTED ===");
         displayMessage('System', '📹 Video call connected.', 'video-answering-' + Date.now());
 
+        // --- NEW: INITIATE CONNECTIONS TO REST OF MESH ---
+        await connectToRemainingParticipants(sender);
+
     } catch (err) {
         console.error("=== FAILED TO ACCEPT VIDEO CALL ===");
         console.error(err);
@@ -1808,5 +1811,49 @@ function denyVideoCall() {
     cleanupWebRTC();
 
     displayMessage('System', '❌ Video call denied.', 'video-denied-' + Date.now());
+}
+
+/**
+ * MESH TOPOLOGY HELPER
+ * Connects to all other available participants (excluding self and the person who just called).
+ * This ensures that if A calls B and C, B will also connect to C.
+ */
+async function connectToRemainingParticipants(excludeUser) {
+    if (!window.availableParticipants) return;
+
+    // Filter targets: Not me, and not the person I just accepted call from
+    const targets = window.availableParticipants.filter(u =>
+        u !== fixedUsername && u !== excludeUser
+    );
+
+    if (targets.length === 0) return;
+
+    console.log(`[Mesh] Connecting to remaining participants: ${targets.join(', ')}`);
+
+    for (const targetUser of targets) {
+        // Check if we already have a connection
+        if (peerConnections.has(targetUser)) {
+            console.log(`[Mesh] Already connected to ${targetUser}, skipping.`);
+            continue;
+        }
+
+        console.log(`[Mesh] Initiating connection to: ${targetUser}`);
+
+        // Create video tile
+        createVideoTile(targetUser);
+
+        // Create peer connection
+        const pc = await createPeerConnectionForUser(targetUser);
+
+        // Create and send offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        chatSocket.send(JSON.stringify({
+            'type': 'webrtc_signal',
+            'data': offer,
+            'target_users': [targetUser]
+        }));
+    }
 }
 

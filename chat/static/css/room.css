@@ -2028,18 +2028,21 @@ emoji-picker {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
     width: 100%;
     height: 100%;
     max-width: 100%;
-    padding: 60px 20px 20px;
+    padding: 0;
+    /* Remove padding to allow absolute children to hit edges */
     box-sizing: border-box;
-    transition: all 0.3s ease;
+    position: relative;
+    /* Anchor for absolute children */
 }
 
 .video-call-overlay.minimized .video-call-content {
     padding: 0;
     gap: 0.5rem;
+    flex-direction: row;
+    /* Horizontal layout for minimized */
 }
 
 /* Participant Count Badge */
@@ -2056,7 +2059,7 @@ emoji-picker {
     gap: 8px;
     font-size: 0.9rem;
     font-weight: 600;
-    z-index: 10;
+    z-index: 100001;
 }
 
 .video-call-participant-count i {
@@ -2075,10 +2078,12 @@ emoji-picker {
     display: grid;
     gap: 12px;
     width: 100%;
-    flex: 1;
-    padding: 10px;
+    height: 100%;
+    max-height: 100vh;
+    padding: 80px 20px 100px;
+    /* Top padding for Info, Bottom for Buttons */
     box-sizing: border-box;
-    max-height: calc(100vh - 200px);
+    overflow-y: auto;
 
     /* Default: 1 participant */
     grid-template-columns: 1fr;
@@ -2267,13 +2272,23 @@ emoji-picker {
     z-index: 2;
 }
 
-/* Video Call Info */
+/* Video Call Info - Moved to TOP Center */
 .video-call-info {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
+    z-index: 100001;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 8px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .video-call-overlay.minimized .video-call-info {
@@ -2281,27 +2296,47 @@ emoji-picker {
 }
 
 .video-call-info h2 {
-    font-size: 1.2rem;
+    font-size: 1rem;
     margin: 0;
-    font-weight: 700;
+    font-weight: 600;
     color: #f1f5f9;
 }
 
-/* Video Call Actions - Bottom Bar Style */
+.video-call-info .call-timer {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+/* Video Call Actions - Fixed at BOTTOM Center */
 .video-call-overlay .call-actions-container {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
     margin-top: 0;
     padding: 12px 24px;
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(10px);
+    background: rgba(30, 41, 59, 0.85);
+    /* Slightly darker/more opaque */
+    backdrop-filter: blur(12px);
     border-radius: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 100002;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    width: auto;
+    max-width: 90%;
+    display: flex;
+    justify-content: center;
 }
 
 .video-call-overlay.minimized .call-actions-container {
+    position: static;
+    transform: none;
     width: 100%;
     padding: 6px;
     border-radius: 10px;
     background: rgba(15, 23, 42, 0.8);
+    box-shadow: none;
+    margin-top: 0;
 }
 
 .video-call-overlay.minimized .call-actions-group {
@@ -2359,50 +2394,60 @@ emoji-picker {
 
 @media (max-width: 768px) {
     .video-call-content {
-        padding: 50px 10px 10px;
-        gap: 0.75rem;
+        padding: 0;
     }
 
     .video-grid {
+        /* Reduced padding for mobile to maximize video size */
+        /* Top: Space for Info Pill (20px top + ~40px height + gap) -> 85px */
+        /* Bottom: Space for Actions (30px bottom + ~60px height + gap) -> 130px */
+        padding: 85px 8px 130px;
         gap: 8px;
-        max-height: calc(100vh - 160px);
+        max-height: 100vh;
     }
 
-    /* Mobile: 2 participants - stacked vertically */
+    /* 1-2 Participants: Stacked Vertical (Big Tiles) */
+    .video-grid.participants-1,
     .video-grid.participants-2 {
         grid-template-columns: 1fr;
-        grid-template-rows: repeat(2, 1fr);
+        grid-template-rows: repeat(auto-fit, minmax(0, 1fr));
     }
 
-    /* Mobile: 3-4 participants - 2x2 grid */
+    /* 3+ Participants: 2 Column Grid (Better Aspect Ratio) */
     .video-grid.participants-3,
     .video-grid.participants-4 {
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(2, 1fr);
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: repeat(2, minmax(0, 1fr));
     }
 
-    /* Mobile: 5+ participants - 2x3 with scroll */
+    /* 5+ Participants: Scrollable 2 Col */
     .video-grid.participants-5,
     .video-grid.participants-6,
     .video-grid.participants-many {
-        grid-template-columns: repeat(2, 1fr);
-        grid-auto-rows: minmax(120px, 1fr);
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: minmax(150px, 1fr);
         overflow-y: auto;
     }
 
     .video-tile {
         border-radius: 12px;
-        min-height: 100px;
+        min-height: 0;
+        /* Allow flex shrinking */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     }
 
     .video-tile-name {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 4px;
     }
 
     .video-tile-overlay {
         padding: 8px;
     }
 
+    /* Adjust controls/info for mobile */
     .video-call-participant-count {
         top: 10px;
         left: 10px;
@@ -2411,11 +2456,29 @@ emoji-picker {
     }
 
     .video-call-info h2 {
-        font-size: 1rem;
+        font-size: 0.9rem;
+    }
+
+    .video-call-info {
+        padding: 6px 12px;
     }
 
     .video-call-overlay .call-actions-container {
-        padding: 10px 16px;
+        padding: 10px 20px;
+        bottom: 80px;
+        width: auto;
+        border-radius: 40px;
+    }
+
+    .video-call-overlay .call-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.2rem;
+    }
+
+    .video-call-overlay .call-btn.danger {
+        width: 56px;
+        height: 56px;
     }
 
     .video-call-overlay.minimized {
@@ -2430,18 +2493,5 @@ emoji-picker {
         right: 10px;
         width: 36px;
         height: 36px;
-    }
-}
-
-@media (max-width: 480px) {
-
-    .video-grid.participants-3,
-    .video-grid.participants-4,
-    .video-grid.participants-5,
-    .video-grid.participants-6,
-    .video-grid.participants-many {
-        grid-template-columns: 1fr;
-        grid-auto-rows: minmax(100px, 150px);
-        overflow-y: auto;
     }
 }
