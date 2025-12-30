@@ -780,6 +780,27 @@ class ChatConsumer(WebsocketConsumer):
                     'target_users': target_users
                 }
             )
+            
+        # --- NEW HANDLER: LEAVE CALL ---
+        elif message_type == 'leave_call':
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name, 
+                {
+                    'type': 'leave_call_handler',
+                    'sender': self.username
+                }
+            )
+
+        # --- NEW HANDLER: ACTIVE CALL PING ---
+        elif message_type == 'active_call_ping':
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'active_call_ping_handler',
+                    'sender': self.username,
+                    'call_type': text_data_json.get('call_type', 'video')
+                }
+            )
     
 
     def webrtc_signal_handler(self, event):
@@ -801,8 +822,30 @@ class ChatConsumer(WebsocketConsumer):
             should_send = True
         elif isinstance(target_users, list) and self.username in target_users:
             should_send = True
-        elif isinstance(target_users, str) and self.username == target_users:
-            should_send = True
+            
+        if should_send:
+             self.send(text_data=json.dumps({
+                'type': 'webrtc_signal',
+                'data': event['data'],
+                'sender': event['sender']
+            }))
+
+    def leave_call_handler(self, event):
+        """Broadcasts that a user has left the WebRTC call."""
+        if self.username == event['sender']: return
+        self.send(text_data=json.dumps({
+            'type': 'leave_call',
+            'sender': event['sender']
+        }))
+
+    def active_call_ping_handler(self, event):
+        """Broadcasts that a call is active to new users."""
+        if self.username == event['sender']: return
+        self.send(text_data=json.dumps({
+            'type': 'active_call_ping',
+            'sender': event['sender'],
+            'call_type': event['call_type']
+        }))
 
         if should_send:
             # Send signal to the client

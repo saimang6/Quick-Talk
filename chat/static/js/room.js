@@ -757,8 +757,6 @@ function handleSocketMessage(e) {
 
         case 'user_list_update':
             if (data.action && data.username) {
-                // Don't show "left the room" message if the owner is leaving (e.g., page refresh)
-                // Show the message for all "joined" actions and "left" actions by non-owners
                 const isOwnerLeaving = (data.username === creatorUsernameContext && data.action === 'left');
 
                 if (!isOwnerLeaving) {
@@ -769,6 +767,39 @@ function handleSocketMessage(e) {
             if (Array.isArray(data.users)) {
                 userCountSpan.textContent = data.users.length;
                 updateUserListDisplay(data.users);
+            }
+            break;
+
+        case 'active_call_ping':
+            // If I am already in a call, ignore
+            if (peerConnection || isVideoCall) return;
+
+            // Show Join Bar
+            const joinBar = document.getElementById('join-call-bar');
+            if (joinBar) {
+                joinBar.classList.remove('hidden');
+
+                // Update text based on call type
+                const textSpan = joinBar.querySelector('span');
+                if (textSpan) {
+                    textSpan.textContent = data.call_type === 'video' ? 'Ongoing Video Call...' : 'Ongoing Voice Call...';
+                }
+
+                // Store call type for the Join button
+                window.activeCallType = data.call_type;
+
+                // Set timeout to hide if no pings received (Call ended)
+                if (window.joinCallTimeout) clearTimeout(window.joinCallTimeout);
+                window.joinCallTimeout = setTimeout(() => {
+                    joinBar.classList.add('hidden');
+                    window.activeCallType = null;
+                }, 15000); // 15 seconds tolerance
+            }
+            break;
+
+        case 'leave_call':
+            if (typeof removeVideoTile === 'function') {
+                removeVideoTile(data.sender);
             }
             break;
 

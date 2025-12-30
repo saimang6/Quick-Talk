@@ -107,6 +107,20 @@ function cleanupWebRTC(keepQueue = false) {
         iceCandidateQueues.clear();
     }
 
+    // --- NEW: Send Leave Call Signal ---
+    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+        chatSocket.send(JSON.stringify({
+            'type': 'leave_call',
+            'sender': fixedUsername
+        }));
+    }
+
+    // --- NEW: Stop Active Call Pinger ---
+    if (window.activeCallPinger) {
+        clearInterval(window.activeCallPinger);
+        window.activeCallPinger = null;
+    }
+
     // 4. Remove and clear the remote audio element (for voice calls)
     const remoteAudio = document.getElementById('remote-voip-audio');
     if (remoteAudio) {
@@ -1391,6 +1405,39 @@ function handleSocketMessage(e) {
             if (Array.isArray(data.users)) {
                 userCountSpan.textContent = data.users.length;
                 updateUserListDisplay(data.users);
+            }
+            break;
+
+        case 'active_call_ping':
+            // If I am already in a call, ignore
+            if (peerConnection || isVideoCall) return;
+
+            // Show Join Bar
+            const joinBar = document.getElementById('join-call-bar');
+            if (joinBar) {
+                joinBar.classList.remove('hidden');
+
+                // Update text based on call type
+                const textSpan = joinBar.querySelector('span');
+                if (textSpan) {
+                    textSpan.textContent = data.call_type === 'video' ? 'Ongoing Video Call...' : 'Ongoing Voice Call...';
+                }
+
+                // Store call type for the Join button
+                window.activeCallType = data.call_type;
+
+                // Set timeout to hide if no pings received (Call ended)
+                if (window.joinCallTimeout) clearTimeout(window.joinCallTimeout);
+                window.joinCallTimeout = setTimeout(() => {
+                    joinBar.classList.add('hidden');
+                    window.activeCallType = null;
+                }, 15000); // 15 seconds tolerance
+            }
+            break;
+
+        case 'leave_call':
+            if (typeof removeVideoTile === 'function') {
+                removeVideoTile(data.sender);
             }
             break;
 

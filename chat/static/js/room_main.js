@@ -287,6 +287,23 @@ if (leaveRoomBtn) leaveRoomBtn.addEventListener('click', confirmAndLeave);
 if (submitButtonDom) submitButtonDom.onclick = sendMessage;
 if (deleteSelectedBtn) deleteSelectedBtn.onclick = deleteSelectedMessages;
 
+// --- NEW: Join Call Button Listener ---
+const joinCallBtn = document.getElementById('join-call-btn');
+if (joinCallBtn) {
+    joinCallBtn.addEventListener('click', () => {
+        console.log(`Joining active call of type: ${window.activeCallType}`);
+        if (window.activeCallType === 'video') {
+            startVideoCall();
+        } else if (window.activeCallType === 'voice') {
+            startVoiceCall();
+        }
+
+        // Hide the bar immediately to prevent double-clicks
+        const joinBar = document.getElementById('join-call-bar');
+        if (joinBar) joinBar.classList.add('hidden');
+    });
+}
+
 // --- FILE UPLOAD LISTENERS ---
 if (attachmentBtn && fileInputDom) {
     attachmentBtn.onclick = () => fileInputDom.click();

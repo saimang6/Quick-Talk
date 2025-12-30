@@ -2494,4 +2494,86 @@ emoji-picker {
         width: 36px;
         height: 36px;
     }
+}/* Join Call Bar Styles */
+.join-call-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #374151;
+    /* Gray-700 */
+    color: white;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 1rem 0;
+    /* Margin top/side, 0 bottom */
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border-left: 4px solid #10B981;
+    /* Green accent */
+    animation: slideDown 0.3s ease-out;
+    z-index: 50;
+}
+
+.join-call-bar.hidden {
+    display: none !important;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.join-call-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.join-call-info span {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.pulsing-dot {
+    width: 10px;
+    height: 10px;
+    background-color: #10B981;
+    border-radius: 50%;
+    animation: pulse-green 1.5s infinite;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.join-call-action-btn {
+    background-color: #10B981;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    padding: 0.4rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.join-call-action-btn:hover {
+    background-color: #059669;
 }
