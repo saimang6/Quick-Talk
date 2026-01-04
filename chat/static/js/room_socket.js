@@ -462,6 +462,21 @@ function toggleVideoCallMic() {
         }
     }
 
+    // Update the microphone icon in the video grid tile
+    const localMicStatus = document.getElementById('local-mic-status');
+    if (localMicStatus) {
+        const icon = localMicStatus.querySelector('i');
+        if (icon) {
+            if (isMicMuted) {
+                icon.classList.remove('fa-microphone');
+                icon.classList.add('fa-microphone-slash');
+            } else {
+                icon.classList.remove('fa-microphone-slash');
+                icon.classList.add('fa-microphone');
+            }
+        }
+    }
+
     console.log("Video call mic " + (isMicMuted ? "muted" : "unmuted"));
 }
 
@@ -482,9 +497,62 @@ function toggleMinimizeVideoCall() {
             }
         }
 
+        updatePaginationButtons();
+
         console.log("Video call interface " + (isMinimized ? "minimized" : "expanded"));
     }
 }
+
+function setupVideoPagination() {
+    const upBtn = document.getElementById('video-page-up-btn');
+    const downBtn = document.getElementById('video-page-down-btn');
+    const videoGrid = document.getElementById('video-grid');
+
+    if (!upBtn || !downBtn || !videoGrid) return;
+
+    upBtn.addEventListener('click', () => {
+        videoGrid.scrollBy({ top: -videoGrid.clientHeight, behavior: 'smooth' });
+    });
+
+    downBtn.addEventListener('click', () => {
+        videoGrid.scrollBy({ top: videoGrid.clientHeight, behavior: 'smooth' });
+    });
+
+    videoGrid.addEventListener('scroll', updatePaginationButtons);
+
+    // Initial check
+    updatePaginationButtons();
+}
+
+function updatePaginationButtons() {
+    const overlay = document.getElementById('video-call-overlay');
+    const upBtn = document.getElementById('video-page-up-btn');
+    const downBtn = document.getElementById('video-page-down-btn');
+    const videoGrid = document.getElementById('video-grid');
+
+    if (!overlay || !upBtn || !downBtn || !videoGrid) return;
+
+    const isMinimized = overlay.classList.contains('minimized');
+
+    // CSS handles visibility, just manage disabled state
+    if (isMinimized) {
+        // Disable up button if at top
+        if (videoGrid.scrollTop <= 5) {
+            upBtn.classList.add('disabled');
+        } else {
+            upBtn.classList.remove('disabled');
+        }
+
+        // Disable down button if at bottom
+        if (videoGrid.scrollTop + videoGrid.clientHeight >= videoGrid.scrollHeight - 5) {
+            downBtn.classList.add('disabled');
+        } else {
+            downBtn.classList.remove('disabled');
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', setupVideoPagination);
 
 function startVideoCallTimer() {
     videoCallStartTime = Date.now();

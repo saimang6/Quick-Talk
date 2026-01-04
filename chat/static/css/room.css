@@ -2007,21 +2007,121 @@ emoji-picker {
     transform: scale(1.1);
 }
 
+/* Minimized Desktop: Vertical Sidebar Style */
 .video-call-overlay.minimized {
-    width: 200px;
-    height: 150px;
-    top: auto;
-    right: 16px;
-    left: auto;
-    bottom: 16px;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(16px);
+    width: 280px;
+    height: auto;
+    max-height: calc(100vh - 100px);
+    /* Fit within screen */
+    min-width: unset;
+    max-width: none;
+    top: 80px;
+    /* Below header */
+    right: 20px;
+    left: 20px;
+    bottom: auto;
+
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
     border-radius: 16px;
-    padding: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 100000;
     transform: none;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.video-call-overlay.minimized:hover {
+    transform: none;
+    /* No scaling on hover for valid bar */
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8);
+}
+
+/* Hide heavy elements in minimized mode, BUT SHOW GRID */
+.video-call-overlay.minimized .video-call-info,
+.video-call-overlay.minimized .video-call-participant-count {
+    display: none !important;
+}
+
+.video-call-overlay.minimized .video-grid {
+    display: flex !important;
+}
+
+/* Re-layout content for vertical sidebar */
+.video-call-overlay.minimized .video-call-content {
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    gap: 10px !important;
+    position: static !important;
+    display: flex !important;
+}
+
+/* Adjust Action Container for vertical sidebar */
+.video-call-overlay.minimized .call-actions-container {
+    position: static !important;
+    transform: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    width: auto !important;
+    margin: 0 !important;
+    backdrop-filter: none !important;
+    order: 4;
+    /* Action buttons at bottom */
+}
+
+.video-call-overlay.minimized .call-actions-group {
+    gap: 12px !important;
+}
+
+/* Smaller buttons for minimized state */
+.video-call-overlay.minimized .call-btn {
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 1rem !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.video-call-overlay.minimized .call-btn:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.video-call-overlay.minimized .call-btn.active {
+    background: #ef4444 !important;
+    /* Red background when active/muted */
+}
+
+.video-call-overlay.minimized .call-btn.danger {
+    width: 42px !important;
+    height: 42px !important;
+    background: #ef4444 !important;
+}
+
+.video-call-overlay.minimized .call-btn.danger:hover {
+    background: #dc2626 !important;
+}
+
+/* Minimized Toggle Button */
+.video-call-overlay.minimized .minimize-call-btn {
+    position: static !important;
+    /* Flow with the flex container if needed, or absolute relative to pill */
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.8rem !important;
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    margin-left: 10px;
+    margin-right: 10px;
 }
 
 .video-call-content {
@@ -2062,10 +2162,6 @@ emoji-picker {
     z-index: 100001;
 }
 
-.video-call-participant-count i {
-    font-size: 0.85rem;
-}
-
 .video-call-overlay.minimized .video-call-participant-count {
     display: none;
 }
@@ -2088,6 +2184,7 @@ emoji-picker {
     /* Default: 1 participant */
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
+    margin-bottom: 10px;
 }
 
 /* 2 participants - side by side */
@@ -2117,12 +2214,91 @@ emoji-picker {
     overflow-y: auto;
 }
 
+/* Show grid in minimized desktop - Horizontal Strip */
+/* Show grid in minimized desktop - Vertical Stack */
 .video-call-overlay.minimized .video-grid {
-    max-height: calc(100% - 50px);
-    gap: 4px;
-    padding: 4px;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
+    display: flex !important;
+    flex-direction: column;
+    /* Vertical */
+    flex: 1 1 auto;
+    width: 100%;
+    max-height: 400px;
+    /* Constrain height to enable overflow */
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    /* Enable scrolling */
+    pointer-events: auto;
+    padding: 0 !important;
+    gap: 12px !important;
+    background: transparent;
+    scroll-behavior: smooth;
+    align-items: center;
+    order: 2;
+    /* Grid in the middle */
+}
+
+/* Tiles in minimized desktop */
+/* Tiles in minimized desktop */
+.video-call-overlay.minimized .video-tile {
+    width: 100%;
+    height: 140px;
+    min-width: 0;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    flex-shrink: 0;
+}
+
+/* ========================================================= */
+/* --- PAGINATION BUTTONS (Desktop Up/Down) --- */
+/* ========================================================= */
+
+.video-pagination-btn {
+    display: none;
+    /* Hidden by default */
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    width: 100%;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+    z-index: 100010;
+    position: static;
+    transform: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-pagination-btn.up {
+    margin-bottom: 0;
+    order: 1;
+    /* Up button first */
+}
+
+.video-pagination-btn.down {
+    margin-top: 0;
+    order: 3;
+    /* Down button after grid */
+}
+
+.video-pagination-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+.video-pagination-btn.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.video-call-overlay.minimized .video-pagination-btn {
+    display: flex !important;
+    /* Always show in minimized for testing */
 }
 
 /* ========================================================= */
@@ -2198,9 +2374,11 @@ emoji-picker {
 .video-tile-status i {
     font-size: 0.75rem;
     color: #10b981;
+    transition: color 0.2s ease;
 }
 
-.video-tile-status i.muted {
+.video-tile-status i.muted,
+.video-tile-status i.fa-microphone-slash {
     color: #ef4444;
 }
 
@@ -2310,7 +2488,7 @@ emoji-picker {
 /* Video Call Actions - Fixed at BOTTOM Center */
 .video-call-overlay .call-actions-container {
     position: absolute;
-    bottom: 30px;
+    bottom: 0px;
     left: 50%;
     transform: translateX(-50%);
     margin-top: 0;
@@ -2331,12 +2509,14 @@ emoji-picker {
 .video-call-overlay.minimized .call-actions-container {
     position: static;
     transform: none;
-    width: 100%;
-    padding: 6px;
-    border-radius: 10px;
-    background: rgba(15, 23, 42, 0.8);
+    width: auto !important;
+    padding: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
     box-shadow: none;
-    margin-top: 0;
+    margin-top: 5px !important;
+    display: flex;
+    justify-content: center;
 }
 
 .video-call-overlay.minimized .call-actions-group {
@@ -2476,16 +2656,105 @@ emoji-picker {
         font-size: 1.2rem;
     }
 
+    /* Mobile Minimized Actions - Ensure row layout inside the pill */
+    .video-call-overlay.minimized .call-actions-container {
+        display: flex !important;
+        flex-direction: row !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        width: auto !important;
+    }
+
     .video-call-overlay .call-btn.danger {
         width: 56px;
         height: 56px;
     }
 
+    /* Mobile Minimized Specifics - Restore Pill Shape and hide filmstrip elements */
     .video-call-overlay.minimized {
-        width: 140px;
-        height: 120px;
-        right: 10px;
-        bottom: 10px;
+        width: auto !important;
+        height: auto !important;
+        min-width: unset !important;
+        max-width: 90vw !important;
+        top: auto !important;
+        bottom: 85px !important;
+        right: 16px !important;
+        left: auto !important;
+
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-radius: 50px !important;
+        padding: 8px 16px !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .video-call-overlay.minimized .video-grid {
+        display: none !important;
+        /* Hide grid on mobile again */
+    }
+
+    .video-call-overlay.minimized .video-pagination-btn {
+        display: none !important;
+        /* Hide pagination */
+    }
+
+    /* Mobile Minimized Specifics - Restore Pill Shape and hide filmstrip elements */
+    .video-call-overlay.minimized {
+        width: auto !important;
+        height: auto !important;
+        min-width: unset !important;
+        max-width: 90vw !important;
+        top: auto !important;
+        bottom: 85px !important;
+        right: 16px !important;
+        left: auto !important;
+
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-radius: 50px !important;
+        padding: 8px 16px !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .video-call-overlay.minimized .video-grid {
+        display: none !important;
+        /* Hide grid on mobile again */
+    }
+
+    .video-call-overlay.minimized .video-pagination-btn {
+        display: none !important;
+        /* Hide pagination */
+    }
+
+    .video-call-overlay.minimized .call-btn {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 0.9rem !important;
+    }
+
+    .video-call-overlay.minimized .call-btn.danger {
+        width: 38px !important;
+        height: 38px !important;
+    }
+
+    /* Hide the minimize/expand button on mobile minimized to save space? 
+       Or keep it small. User said "audio, video, end call". 
+       Let's hide the expand button, user can tap the bar to expand if we add js, 
+       but currently JS expects button. 
+       Let's keep it but very subtle or rely on the container click if JS supports it.
+       The JS logic (toggleMinimizeVideoCall) is triggered by the button click.
+       Let's keep it visible but small.
+    */
+    .video-call-overlay.minimized .minimize-call-btn {
+        width: 28px !important;
+        height: 28px !important;
+        margin-left: 6px !important;
+        border: none !important;
     }
 
     .video-call-overlay .minimize-call-btn {
@@ -2494,7 +2763,9 @@ emoji-picker {
         width: 36px;
         height: 36px;
     }
-}/* Join Call Bar Styles */
+}
+
+/* Join Call Bar Styles */
 .join-call-bar {
     display: flex;
     align-items: center;
