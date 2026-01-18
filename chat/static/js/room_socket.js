@@ -1411,6 +1411,29 @@ function handleSocketMessage(e) {
             }
             break;
 
+        case 'participant_removed':
+            // Participant was removed by the room owner
+            if (!isOwner) {
+                const removedBy = data.removed_by || 'the room owner';
+
+                Swal.fire({
+                    title: 'Removed from Room',
+                    html: `You have been removed from this room by <strong>${removedBy}</strong>.`,
+                    icon: 'warning',
+                    confirmButtonColor: '#DC2626',
+                    confirmButtonText: 'Return to Lobby',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(() => {
+                    isUserLeaving = true;
+                    disableExitPrevention();
+                    if (chatSocket) chatSocket.close();
+                    window.location.assign(`/chat/lobby/?username=${fixedUsername}`);
+                });
+            }
+            break;
+
+
         case 'join_request_notification':
             if (isOwner && data.requester_username) {
                 displayRequestCard(data.requester_username);

@@ -502,12 +502,17 @@ function updateUserListDisplay(users) {
 
     sortedUsers.forEach(user => {
         const li = document.createElement('li');
-        li.textContent = user;
         li.classList.add('user-list-item-base');
 
+        // Create a container for the username
+        const usernameSpan = document.createElement('span');
+        usernameSpan.textContent = user;
+        usernameSpan.classList.add('participant-username');
+
         if (user === fixedUsername) {
-            li.textContent += ' (You)';
+            usernameSpan.textContent += ' (You)';
             li.classList.add('current-user-highlight');
+            li.appendChild(usernameSpan);
         } else {
             // Other users are selectable for calls
             li.classList.add('selectable-participant');
@@ -517,7 +522,12 @@ function updateUserListDisplay(users) {
                 li.classList.add('selected-for-call');
             }
 
-            li.onclick = () => {
+            li.onclick = (e) => {
+                // Don't toggle selection if clicking the remove button
+                if (e.target.closest('.remove-participant-btn')) {
+                    return;
+                }
+
                 const isSelected = li.classList.toggle('selected-for-call');
                 if (isSelected) {
                     selectedCallParticipants.add(user);
@@ -527,6 +537,21 @@ function updateUserListDisplay(users) {
                     console.log(`User ${user} deselected.`);
                 }
             };
+
+            li.appendChild(usernameSpan);
+
+            // Add remove button if current user is the owner
+            if (isOwner) {
+                const removeBtn = document.createElement('button');
+                removeBtn.classList.add('remove-participant-btn');
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.title = `Remove ${user}`;
+                removeBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent triggering the li click
+                    removeParticipant(user);
+                };
+                li.appendChild(removeBtn);
+            }
         }
         userListContainer.appendChild(li);
     });
@@ -534,6 +559,38 @@ function updateUserListDisplay(users) {
     // --- UPDATE GLOBAL PARTICIPANTS LIST FOR MENTIONS ---
     window.availableParticipants = sortedUsers;
     console.log("Updated participants for mentions:", window.availableParticipants);
+}
+
+// Function to remove a participant (owner only)
+function removeParticipant(username) {
+    if (!isOwner) {
+        console.error("Only the room owner can remove participants.");
+        return;
+    }
+
+    Swal.fire({
+        title: 'Remove Participant?',
+        html: `Are you sure you want to remove <strong style="color: #EF4444;">${username}</strong> from the room?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#DC2626',
+        cancelButtonColor: '#4B5563',
+        confirmButtonText: 'Yes, Remove',
+        cancelButtonText: 'Cancel',
+        customClass: { container: 'mobile-alert-responsive-container' }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Send remove request to server
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.send(JSON.stringify({
+                    'type': 'remove_participant',
+                    'target_username': username,
+                    'sender': fixedUsername
+                }));
+                console.log(`Sent remove request for ${username}`);
+            }
+        }
+    });
 }
 
 function updateDeleteButton() {

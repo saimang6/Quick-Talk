@@ -606,6 +606,67 @@ class ChatConsumer(WebsocketConsumer):
             # 4. Update the request count panel for the owner
                 self.broadcast_request_count_to_owner() 
 
+        # --- HANDLER: REMOVE PARTICIPANT (OWNER ONLY) ---
+        elif message_type == 'remove_participant':
+            # Only the room owner can remove participants
+            if not self.is_owner:
+                self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Only the room owner can remove participants.'
+                }))
+                return
+            
+            target_username = text_data_json.get('target_username')
+            
+            # Prevent owner from removing themselves
+            if target_username == self.username:
+                self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'You cannot remove yourself from the room.'
+                }))
+                return
+            
+            # Check if the target user is in the room
+            if self.room_slug in self.ROOM_USERS and target_username in self.ROOM_USERS[self.room_slug]:
+                target_channel = self.ROOM_USERS[self.room_slug][target_username]
+                
+                # Send notification to the removed user
+                async_to_sync(self.channel_layer.send)(
+                    target_channel,
+                    {
+                        'type': 'participant_removed',
+                        'removed_by': self.username
+                    }
+                )
+                
+                # Remove the user from the room
+                del self.ROOM_USERS[self.room_slug][target_username]
+                
+                # Remove from typing list if present
+                if self.room_slug in self.ROOM_TYPERS and target_username in self.ROOM_TYPERS[self.room_slug]:
+                    self.ROOM_TYPERS[self.room_slug].discard(target_username)
+                    self.broadcast_typing_users()
+                
+                # Remove from group
+                async_to_sync(self.channel_layer.group_discard)(
+                    self.room_group_name,
+                    target_channel
+                )
+                
+                # Broadcast updated user list
+                self.broadcast_user_list(send_join_message=False)
+                
+                # Send system message
+                self.send_system_message(f"**{target_username}** was removed from the room by {self.username}.")
+                
+                print(f"User {target_username} was removed from room {self.room_slug} by owner {self.username}")
+            else:
+                self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': f'User {target_username} is not in the room.'
+                }))
+ 
+
         # --- HANDLER: STANDARD MESSAGE (ACTIVE USER ONLY) ---
         elif message_type == 'message':
             # IMPORTANT: Prevent pending users from sending messages
@@ -879,6 +940,14 @@ class ChatConsumer(WebsocketConsumer):
         """Handler for when the owner denies the join request."""
         # Client side should show denial message and potentially disconnect
         self.send(text_data=json.dumps({'type': 'access_denied'}))
+    
+    def participant_removed(self, event):
+        """Handler for when a participant is removed from the room by the owner."""
+        self.send(text_data=json.dumps({
+            'type': 'participant_removed',
+            'removed_by': event['removed_by']
+        }))
+
         
     def join_request_notification(self, event):
         """Handler for sending a new request notification to the owner."""
