@@ -1344,16 +1344,9 @@ function sendTypingStop() {
 /**
  * Sends a command to the server to delete the current room.
  */
+// --- DEPRECATED: sendDeleteRoom is now handled via manual button in lobby ---
 function sendDeleteRoom() {
-    if (isOwner && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-        chatSocket.send(JSON.stringify({
-            'type': 'delete_room',
-            'sender': fixedUsername,
-            'room_slug': roomSlug
-        }));
-        // Note: The server should process the deletion and the client should redirect immediately after sending.
-        console.log("Sent 'delete_room' command to the server.");
-    }
+    console.warn("sendDeleteRoom called but is deprecated. Use manual delete in lobby.");
 }
 
 function sendReaction(messageId, emoji) {
@@ -1456,6 +1449,30 @@ function handleSocketMessage(e) {
                     if (chatSocket) chatSocket.close();
                     window.location.assign(`/chat/lobby/?username=${fixedUsername}`);
                 });
+            }
+            break;
+
+        case 'room_deleted':
+            // This is still useful as a signal to other participants if the owner deletes the room from the lobby.
+            if (!isOwner) {
+                // Participants: show notification first
+                const deletedBy = data.deleted_by || 'the room owner';
+
+                Swal.fire({
+                    title: 'Room Deleted',
+                    html: `This room has been permanently deleted by <strong>${deletedBy}</strong>.`,
+                    icon: 'error',
+                    confirmButtonColor: '#4F46E5',
+                    confirmButtonText: 'Return to Lobby',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(() => {
+                    isUserLeaving = true;
+                    disableExitPrevention();
+                    window.location.replace(`/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`);
+                });
+            } else {
+                console.log("Room deleted by owner (confirmed).");
             }
             break;
 

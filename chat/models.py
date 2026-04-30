@@ -11,7 +11,7 @@ class Room(models.Model):
     
     # The username of the user who created the room
     owner_username = models.CharField(max_length=100) 
-
+    
     # NEW FIELD: Stores the secret number/code known only to the owner
     secret_number = models.CharField(max_length=50, default='')
     

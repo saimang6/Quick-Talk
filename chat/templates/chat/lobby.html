@@ -27,12 +27,22 @@
                 {% for room in rooms %}
                 <div class="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all group">
                     <span class="font-semibold text-slate-200 group-hover:text-white transition-colors">{{ room.name }}</span>
-                    <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
-                        data-room-slug="{{ room.slug }}"
-                        data-room-url="{% url 'room' room_slug=room.slug %}"
-                        data-room-owner="{{ room.owner_username }}">
-                        Enter Room
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
+                            data-room-slug="{{ room.slug }}"
+                            data-room-url="{% url 'room' room_slug=room.slug %}"
+                            data-room-owner="{{ room.owner_username }}">
+                            Enter Room
+                        </button>
+                        {% if room.owner_username == username %}
+                        <button class="delete-room-button flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 text-sm font-bold rounded-lg border border-rose-500/20 transition-all group/del"
+                            data-room-slug="{{ room.slug }}"
+                            data-room-name="{{ room.name }}">
+                            <i class="fas fa-trash-alt group-hover/del:scale-110 transition-transform"></i>
+                            <span>Delete</span>
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 {% empty %}
                 <div class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
@@ -131,9 +141,12 @@
 
     let previousRoomSlugs = new Set();
 
-    async function updateRoomList() {
+    setInterval(() => updateRoomList(CURRENT_USERNAME), 3000);
+
+    async function updateRoomList(username) {
         try {
-            const response = await fetch('/chat/api/rooms/');
+            // Add a cache-buster timestamp to ensure we always get fresh data
+            const response = await fetch(`/chat/api/rooms/?username=${encodeURIComponent(username)}&_=${Date.now()}`);
             const data = await response.json();
             const rooms = data.rooms;
             const currentRoomSlugs = new Set(rooms.map(r => r.slug));
@@ -146,17 +159,28 @@
                             <p class="text-slate-500">No rooms available. Be the first to create one!</p>
                         </div>`;
                 } else {
-                    container.innerHTML = rooms.map(room => `
+                    container.innerHTML = rooms.map(room => {
+                        const isOwner = (room.owner_username === CURRENT_USERNAME);
+                        return `
                         <div class="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all group animate-fadeIn">
                             <span class="font-semibold text-slate-200 group-hover:text-white transition-colors">${room.name}</span>
-                            <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
-                                data-room-slug="${room.slug}"
-                                data-room-url="/chat/room/${room.slug}/"
-                                data-room-owner="${room.owner_username}">
-                                Enter Room
-                            </button>
-                        </div>
-                    `).join('');
+                            <div class="flex items-center gap-3">
+                                <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
+                                    data-room-slug="${room.slug}"
+                                    data-room-url="/chat/room/${room.slug}/"
+                                    data-room-owner="${room.owner_username}">
+                                    Enter Room
+                                </button>
+                                ${isOwner ? `
+                                <button class="delete-room-button flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 text-sm font-bold rounded-lg border border-rose-500/20 transition-all group/del"
+                                    data-room-slug="${room.slug}"
+                                    data-room-name="${room.name}">
+                                    <i class="fas fa-trash-alt group-hover/del:scale-110 transition-transform"></i>
+                                    <span>Delete</span>
+                                </button>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
                 }
                 previousRoomSlugs = currentRoomSlugs;
             }
@@ -210,10 +234,59 @@
         }
     };
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         if (e.target.classList.contains('join-request-button')) {
             const url = e.target.dataset.roomUrl;
             window.location.href = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}`;
+        }
+
+        // --- ROOM DELETION LOGIC ---
+        const deleteBtn = e.target.closest('.delete-room-button');
+        if (deleteBtn) {
+            const slug = deleteBtn.dataset.roomSlug;
+            const name = deleteBtn.dataset.roomName;
+
+            const result = await Swal.fire({
+                title: 'Delete Room?',
+                html: `Are you sure you want to permanently delete <strong>${name}</strong>?<br><br><span class="text-xs text-slate-500">This will disconnect all active participants.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#DC2626',
+                cancelButtonColor: '#4B5563',
+                confirmButtonText: 'Yes, Delete Room'
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`/chat/api/rooms/${slug}/delete/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({ username: CURRENT_USERNAME })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        Swal.fire({
+                            title: 'Deleted!',
+                            text: 'Room has been deleted successfully.',
+                            icon: 'success',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                        // Force a full page reload to ensure the UI is perfectly synced with the DB
+                        setTimeout(() => {
+                            window.location.replace(`/chat/lobby/?username=${encodeURIComponent(CURRENT_USERNAME)}`);
+                        }, 500);
+                    } else {
+                        throw new Error(data.error || 'Failed to delete room');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            }
         }
     });
 

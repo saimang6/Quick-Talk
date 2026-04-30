@@ -97,16 +97,21 @@ if (document.getElementById('is-requester')) {
 }
 
 // Initial UI setup
-currentUsernameSpan.textContent = fixedUsername;
-if (isOwner && typeof updateRequestPanelContent === 'function') updateRequestPanelContent(); // Will be defined later, safe to skip here
+if (currentUsernameSpan && typeof fixedUsername !== 'undefined') {
+    currentUsernameSpan.textContent = fixedUsername;
+}
+
+if (typeof isOwner !== 'undefined' && isOwner && typeof updateRequestPanelContent === 'function') {
+    updateRequestPanelContent(); 
+}
 
 if (creatorInfoContainer) {
-    if (isOwner) {
+    if (typeof isOwner !== 'undefined' && isOwner) {
         // Show the info if the current user is the owner
-        creatorInfoContainer.style.display = 'block'; // Or 'flex', depending on your CSS
+        creatorInfoContainer.style.display = 'block'; 
     } else {
         // Hide the info if the current user is not the owner
         creatorInfoContainer.style.display = 'none';
-        currentUserDisplay.style.marginTop = '23px';
+        if (currentUserDisplay) currentUserDisplay.style.marginTop = '23px';
     }
 }

@@ -294,9 +294,13 @@ function updateTypingIndicator(users) {
 }
 
 function toggleUserList() {
-    if (userListDrawer) {
+    if (typeof userListDrawer !== 'undefined' && userListDrawer) {
         userListDrawer.classList.toggle('is-open');
         document.body.classList.toggle('no-scroll');
+    }
+    // Safe check for drawerBackdrop from room_config.js
+    if (typeof drawerBackdrop !== 'undefined' && drawerBackdrop) {
+        drawerBackdrop.classList.toggle('hidden');
     }
 }
 
@@ -501,94 +505,41 @@ function displayRequestCard(requester, updateCount = true) {
 }
 
 function confirmAndLeave() {
-    const participantCount = getParticipantCountValue();
-    const redirectToLobby = () => {
+    const redirectToLobby = (isExplicitLeave = false) => {
         isUserLeaving = true;
-
-        // --- FIX 2B: Clear the unload handler before navigating ---
         disableExitPrevention();
 
-        // FAILSAFE: Send explicit leave signal (handled by server to remove user from list)
-        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-            console.log("Sending explicit_leave signal...");
+        if (isExplicitLeave && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
             chatSocket.send(JSON.stringify({ 'type': 'explicit_leave', 'sender': fixedUsername }));
         }
 
-        if (chatSocket) chatSocket.close();
-
-        sessionStorage.setItem('user_left_room', 'true');
-        const redirectUrl = `/chat/lobby/?username=${fixedUsername}`;
-        window.location.replace(redirectUrl);
+        setTimeout(() => {
+            sessionStorage.setItem('user_left_room', 'true');
+            const redirectUrl = `/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`;
+            window.location.replace(redirectUrl);
+        }, 150);
     };
 
-    // 1. Owner Check Logic (Block leaving if others present)
-    if (isOwner && participantCount > 1) {
-        Swal.fire({
-            title: 'Cannot Leave Room!',
-            html: `
-                <p class="text-lg">You cannot leave while <strong style="color: #FBBF24;">${participantCount - 1} other participant(s)</strong> are still active!</p>
-                <p class="text-sm mt-3" style="color: #9CA3AF;">Please wait for all other participants to leave before you exit the room and close the session.</p>
-            `,
-            icon: 'warning',
-            customClass: { container: 'mobile-alert-responsive-container' },
-            confirmButtonText: 'Stay in Room',
-            confirmButtonColor: '#4F46E5'
-        });
-        return;
-    }
+    const title = 'Leave Chat Room?';
+    const htmlText = isOwner 
+        ? 'You are about to leave the room. The room will remain active unless you delete it from the lobby.'
+        : 'You will be disconnected from the chat and won\'t see previous messages when you rejoin.';
 
-    // 2. Owner is last person: Offer delete options
-    if (isOwner && participantCount <= 1) {
-        Swal.fire({
-            title: 'Confirm Exit and Close Room',
-            html: 'You may leave the room now.<br> <strong class="text-red-400">Select "Leave and Delete Room".</strong>',
-            icon: 'warning',
-            customClass: { container: 'mobile-alert-responsive-container' },
-            showCancelButton: true,
-            showDenyButton: false,
-
-            // Button Colors
-            confirmButtonColor: '#DC2626', // Red for immediate Delete
-            // denyButtonColor: '#4B5563',
-            cancelButtonColor: '#4B5563',
-
-            // Button Texts
-            confirmButtonText: 'Yes, Leave and Delete Room', // Deletes immediately via WS
-            // denyButtonText: 'Stay in Room',
-            cancelButtonText: 'Stay in Room'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // ACTION: Send DELETE command via WebSocket immediately, then redirect.
-                sendDeleteRoom();
-                redirectToLobby();
-            } else if (result.isDenied) {
-                // ACTION: Standard exit without deletion signal
-                redirectToLobby();
-            }
-            // If cancelled, do nothing
-        });
-
-    } else {
-        // 3. Non-Owner logic
-        const title = 'Are you sure you want to leave?';
-        const htmlText = 'You will be disconnected from the chat. You will not be able to view previous messages when you rejoin.';
-
-        Swal.fire({
-            title: title,
-            html: htmlText,
-            icon: 'warning',
-            customClass: { container: 'mobile-alert-responsive-container' },
-            showCancelButton: true,
-            confirmButtonColor: '#DC2626',
-            cancelButtonColor: '#4B5563',
-            confirmButtonText: 'Yes, Leave Room',
-            cancelButtonText: 'Stay in Room'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                redirectToLobby();
-            }
-        });
-    }
+    Swal.fire({
+        title: title,
+        html: htmlText,
+        icon: 'warning',
+        customClass: { container: 'mobile-alert-responsive-container' },
+        showCancelButton: true,
+        confirmButtonColor: '#DC2626',
+        cancelButtonColor: '#4B5563',
+        confirmButtonText: 'Yes, Leave Room',
+        cancelButtonText: 'Stay in Room'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            redirectToLobby(true);
+        }
+    });
 }
 
 // --- NEW: MENTION LOGIC ---
@@ -720,21 +671,16 @@ function cancelReply() {
     }
 })();
 
-function toggleUserList() {
-    if (userListDrawer) {
-        userListDrawer.classList.toggle('is-open');
+// --- MOBILE MENU INITIALIZATION ---
+// The drawerBackdrop event listener is moved here to be safe
+(function initMobileMenu() {
+    if (typeof drawerBackdrop !== 'undefined' && drawerBackdrop) {
+        drawerBackdrop.addEventListener('click', toggleUserList);
     }
-    if (drawerBackdrop) {
-        drawerBackdrop.classList.toggle('hidden');
-    }
-}
-
-if (drawerBackdrop) {
-    drawerBackdrop.addEventListener('click', toggleUserList);
-}
+})();
 
 // --- EMOJI PICKER LOGIC ---
-if (emojiToggleBtn && emojiPickerPopover) {
+if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPickerPopover !== 'undefined' && emojiPickerPopover) {
     emojiToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         emojiPickerPopover.classList.toggle('hidden');
@@ -746,7 +692,7 @@ if (emojiToggleBtn && emojiPickerPopover) {
     });
 }
 
-if (emojiPickerElement && messageInputDom) {
+if (typeof emojiPickerElement !== 'undefined' && emojiPickerElement && typeof messageInputDom !== 'undefined' && messageInputDom) {
     emojiPickerElement.addEventListener('emoji-click', event => {
         const emoji = event.detail.emoji.unicode;
         const start = messageInputDom.selectionStart;
@@ -760,8 +706,10 @@ if (emojiPickerElement && messageInputDom) {
 }
 
 document.addEventListener('click', (e) => {
-    if (emojiPickerPopover && !emojiPickerPopover.contains(e.target) && !emojiToggleBtn.contains(e.target)) {
-        emojiPickerPopover.classList.add('hidden');
+    if (typeof emojiPickerPopover !== 'undefined' && emojiPickerPopover && typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn) {
+        if (!emojiPickerPopover.contains(e.target) && !emojiToggleBtn.contains(e.target)) {
+            emojiPickerPopover.classList.add('hidden');
+        }
     }
 });
 

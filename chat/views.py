@@ -20,20 +20,74 @@ def lobby(request):
         # If no username is set, redirect back to the welcome page
         return redirect(reverse('index'))
         
-    rooms = Room.objects.all() # Get all rooms from the database
+    all_rooms = Room.objects.all()
+    from .consumers import ChatConsumer
     
+    # Show all rooms from the database. 
+    # Manual deletion by the owner is now the primary way rooms are removed.
+    active_rooms = all_rooms
+
     return render(request, 'chat/lobby.html', {
         'username': username,
-        'rooms': rooms,
+        'rooms': active_rooms,
     })
 
-# 2b. API Endpoint - Return rooms as JSON for polling
-from django.http import JsonResponse
-
 def get_rooms_json(request):
-    """Returns all rooms as JSON for real-time updates in the lobby."""
-    rooms = Room.objects.all().values('name', 'slug', 'owner_username')
-    return JsonResponse({'rooms': list(rooms)})
+    """Returns all rooms as JSON for real-time updates in the lobby, filtering out inactive rooms."""
+    from .consumers import ChatConsumer
+    
+    all_rooms = Room.objects.all().values('name', 'slug', 'owner_username')
+    active_rooms = []
+    
+    # Return all rooms. This prevents 'flickering' in the UI when users refresh.
+    active_rooms = list(all_rooms)
+            
+    return JsonResponse({'rooms': active_rooms})
+
+@require_POST
+@csrf_exempt
+def delete_room_json(request, room_slug):
+    """API endpoint for the owner to manually delete a room."""
+    import json
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        
+        room = get_object_or_404(Room, slug=room_slug)
+        
+        if room.owner_username != username:
+            return JsonResponse({'error': 'Unauthorized. Only the owner can delete this room.'}, status=403)
+            
+        # Delete from DB
+        room.delete()
+
+        # 2. Static Cleanup (Force clear the memory state)
+        # We must clear these so the lobby doesn't think the room is still "active"
+        from .consumers import ChatConsumer
+        if room_slug in ChatConsumer.ROOM_USERS:
+            del ChatConsumer.ROOM_USERS[room_slug]
+        if room_slug in ChatConsumer.ROOM_TYPERS:
+            del ChatConsumer.ROOM_TYPERS[room_slug]
+        if room_slug in ChatConsumer.ROOM_REQUESTERS:
+            del ChatConsumer.ROOM_REQUESTERS[room_slug]
+        if room_slug in ChatConsumer.ROOM_OWNER_CHANNELS:
+            del ChatConsumer.ROOM_OWNER_CHANNELS[room_slug]
+        if room_slug in ChatConsumer.ROOM_ACTIVE_CONNECTIONS:
+            del ChatConsumer.ROOM_ACTIVE_CONNECTIONS[room_slug]
+        
+        # 3. Broadcast deletion to group so any active users are kicked
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'chat_{room_slug}',
+            {
+                'type': 'room_deleted_broadcast',
+                'deleted_by': username
+            }
+        )
+        
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 @require_POST
 @csrf_exempt
@@ -54,11 +108,19 @@ def create_room_json(request):
         base_slug = room_name.lower().replace(' ', '-')
         unique_slug = f"{base_slug}-{str(uuid.uuid4())[:8]}"
         
-        # Check if room already exists with same name (optional, but good)
-        if Room.objects.filter(name=room_name).exists():
-             # We can allow multiple rooms with same name but different slugs, 
-             # but let's make the name unique for now as per model
-             return JsonResponse({'error': 'Room name already exists'}, status=400)
+        # Check if room already exists with same name
+        existing_rooms = Room.objects.filter(name=room_name)
+        if existing_rooms.exists():
+            from .consumers import ChatConsumer
+            for old_room in existing_rooms:
+                active_conns = ChatConsumer.ROOM_ACTIVE_CONNECTIONS.get(old_room.slug, set())
+                persisted_users = ChatConsumer.ROOM_USERS.get(old_room.slug, {})
+                
+                # If the room is completely abandoned, it's safe to delete it to free up the name
+                if not active_conns and not persisted_users:
+                    old_room.delete()
+                else:
+                    return JsonResponse({'error': 'Room name already exists and is currently in use'}, status=400)
 
         room = Room.objects.create(
             name=room_name,

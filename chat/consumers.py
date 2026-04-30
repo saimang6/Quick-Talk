@@ -273,19 +273,9 @@ class ChatConsumer(WebsocketConsumer):
         if user_left:
             self.broadcast_user_list(send_join_message=False)
             
-            # 6. Clean up room state if the room is now empty
-            if not self.ROOM_USERS.get(self.room_slug): 
-                print(f"Room {self.room_slug} is now empty. Deleting all messages for the room.")
-                try:
-                    Message.objects.filter(room=self.room_instance).delete()
-                except Exception:
-                    pass
-                
-                # Cleanup static dictionaries
-                if self.room_slug in self.ROOM_USERS: del self.ROOM_USERS[self.room_slug]
-                if self.room_slug in self.ROOM_TYPERS: del self.ROOM_TYPERS[self.room_slug]
-                if self.room_slug in self.ROOM_REQUESTERS: del self.ROOM_REQUESTERS[self.room_slug]
-                if self.room_slug in self.ROOM_OWNER_CHANNELS: del self.ROOM_OWNER_CHANNELS[self.room_slug]
+            # Note: Automatic room deletion when empty is now disabled.
+            # Owners must delete rooms manually from the lobby.
+            pass
 
         # 7. Clean up typing users (always safe to run)
         if self.room_slug in self.ROOM_TYPERS and self.username in self.ROOM_TYPERS[self.room_slug]:
@@ -451,59 +441,10 @@ class ChatConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message_type = text_data_json.get('type', 'message')
         
-        # --- NEW HANDLER: ROOM DELETION (OWNER ONLY) ---
+        # --- DEPRECATED HANDLER: ROOM DELETION ---
         if message_type == 'delete_room':
-            if not self.is_owner:
-                self.send(text_data=json.dumps({
-                    'type': 'error',
-                    'message': 'Only the room owner can delete this room.'
-                }))
-                return
-
-            print(f"Room owner {self.username} requested immediate deletion of room {self.room_slug}.")
-
-            try:
-                # 1. Database Deletion
-                # This should handle all associated Messages due to CASCADE setting on the ForeignKey.
-                self.room_instance.delete()
-                
-                # 2. Static Cleanup (Force clear the memory state)
-                # This is important to ensure a new connection for the same room slug
-                # doesn't pick up stale channel information if it occurs rapidly.
-                if self.room_slug in self.ROOM_USERS:
-                    del self.ROOM_USERS[self.room_slug]
-                if self.room_slug in self.ROOM_TYPERS:
-                    del self.ROOM_TYPERS[self.room_slug]
-                if self.room_slug in self.ROOM_REQUESTERS:
-                    del self.ROOM_REQUESTERS[self.room_slug]
-                if self.room_slug in self.ROOM_OWNER_CHANNELS:
-                    del self.ROOM_OWNER_CHANNELS[self.room_slug]
-                if self.room_slug in self.ROOM_ACTIVE_CONNECTIONS:
-                    del self.ROOM_ACTIVE_CONNECTIONS[self.room_slug]
-
-                # 3. Inform the group before closing (for any remaining users)
-                # Use uuid.uuid4() for message ID since we are not saving it to the DB.
-                async_to_sync(self.channel_layer.group_send)(
-                    self.room_group_name,
-                    {
-                        'type': 'chat_message',
-                        'message': f"The room has been permanently deleted by the owner, {self.username}.",
-                        'sender': 'System',
-                        'message_id': str(uuid.uuid4()),
-                    }
-                )
-                
-                # 4. Close the owner's connection (will trigger disconnect logic)
-                # Client is redirecting immediately, but we close here for server-side cleanup.
-                self.close(code=4007) 
-
-            except Exception as e:
-                print(f"Error during room deletion for {self.room_slug}: {e}")
-                self.send(text_data=json.dumps({
-                    'type': 'error',
-                    'message': 'An internal error occurred while deleting the room.'
-                }))
-                
+             pass
+        
         # --- NEW HANDLER: EXPLICIT LEAVE ---
         elif message_type == 'explicit_leave':
             # Mark this consumer instance as intentionally leaving
@@ -1083,6 +1024,14 @@ class ChatConsumer(WebsocketConsumer):
             
             if changes_made:
                 self.broadcast_user_list(send_join_message=False)
+                
+                # NEW: If the room is now empty after stale cleanup, delete it
+                if not self.ROOM_USERS.get(self.room_slug):
+                    print(f"Room {self.room_slug} became empty after stale cleanup. Deleting.")
+                    try:
+                        self.room_instance.delete()
+                    except Exception:
+                        pass
 
     def delete_for_me_confirmed(self, event):
         """Sends confirmation to the user that messages should be deleted locally."""
@@ -1097,4 +1046,11 @@ class ChatConsumer(WebsocketConsumer):
             'type': 'reaction_update',
             'message_id': event['message_id'],
             'reactions': event['reactions']
+        }))
+
+    def room_deleted_broadcast(self, event):
+        """Broadcasts that the room has been deleted by the owner."""
+        self.send(text_data=json.dumps({
+            'type': 'room_deleted',
+            'deleted_by': event['deleted_by']
         }))
