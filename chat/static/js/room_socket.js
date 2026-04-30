@@ -181,11 +181,19 @@ function showCallInterface(isIncoming = false) {
             if (incomingActions) incomingActions.classList.remove('hidden');
             if (statusText) statusText.textContent = "Incoming Voice Call";
             stopCallTimer();
+            // Play ringtone for incoming call
+            if (window.ringtoneManager) {
+                window.ringtoneManager.play();
+            }
         } else {
             if (ongoingActions) ongoingActions.classList.remove('hidden');
             if (incomingActions) incomingActions.classList.add('hidden');
             if (statusText) statusText.textContent = "Ongoing Voice Call";
             startCallTimer();
+            // Stop ringtone when call becomes ongoing
+            if (window.ringtoneManager) {
+                window.ringtoneManager.stop();
+            }
         }
     }
 }
@@ -268,6 +276,11 @@ function hideCallInterface() {
         const miniBtn = document.getElementById('minimize-call-btn');
         if (miniBtn) miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
         stopCallTimer();
+    }
+
+    // Stop ringtone when call interface is hidden
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
     }
 }
 
@@ -353,11 +366,19 @@ function showVideoCallInterface(isIncoming = false) {
             if (incomingActions) incomingActions.classList.remove('hidden');
             if (statusText) statusText.textContent = "Incoming Video Call";
             stopVideoCallTimer();
+            // Play ringtone for incoming video call
+            if (window.ringtoneManager) {
+                window.ringtoneManager.play();
+            }
         } else {
             if (ongoingActions) ongoingActions.classList.remove('hidden');
             if (incomingActions) incomingActions.classList.add('hidden');
             if (statusText) statusText.textContent = "Ongoing Video Call";
             startVideoCallTimer();
+            // Stop ringtone when video call becomes ongoing
+            if (window.ringtoneManager) {
+                window.ringtoneManager.stop();
+            }
         }
     }
 }
@@ -370,6 +391,11 @@ function hideVideoCallInterface() {
         const miniBtn = document.getElementById('minimize-video-call-btn');
         if (miniBtn) miniBtn.innerHTML = '<i class="fas fa-compress-alt"></i>';
         stopVideoCallTimer();
+    }
+
+    // Stop ringtone when video call interface is hidden
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
     }
 }
 
@@ -1770,6 +1796,11 @@ async function acceptCall() {
     const { offer, sender } = pendingCallData;
     pendingCallData = null; // Clear pending data
 
+    // Stop ringtone when call is accepted
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
+    }
+
     try {
         console.log("Accepting call from:", sender);
 
@@ -1834,6 +1865,11 @@ function denyCall() {
     if (!pendingCallData) return;
     console.log("Denying call from:", pendingCallData.sender);
 
+    // Stop ringtone when call is denied
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
+    }
+
     // Notify the other side optionally (for now just cleanup)
     pendingCallData = null;
     cleanupWebRTC();
@@ -1848,6 +1884,11 @@ async function acceptVideoCall() {
     if (!pendingVideoCallData) return;
     const { offer, sender } = pendingVideoCallData;
     pendingVideoCallData = null;
+
+    // Stop ringtone when video call is accepted
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
+    }
 
     try {
         console.log("Accepting VIDEO call from:", sender);
@@ -1943,6 +1984,11 @@ async function acceptVideoCall() {
 function denyVideoCall() {
     if (!pendingVideoCallData) return;
     console.log("Denying video call from:", pendingVideoCallData.sender);
+
+    // Stop ringtone when video call is denied
+    if (window.ringtoneManager) {
+        window.ringtoneManager.stop();
+    }
 
     pendingVideoCallData = null;
     isVideoCall = false;
