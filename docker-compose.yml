@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   # 1. Django Web App Service
   redis:
     image: redis:6-alpine
     container_name: django-chat-app-redis-1
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck: # <--- NEW SECTION
       test: ["CMD", "redis-cli", "ping"]
       interval: 1s
@@ -21,7 +19,7 @@ services:
     volumes:
       - .:/usr/src/app
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       db:
         condition: service_started # <-- CRITICAL FIX: Changed to service_started

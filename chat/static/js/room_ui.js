@@ -13,199 +13,9 @@ const REACTION_MAP = {
 let currentReplyId = null; // Track active reply
 
 
-// Inject Reaction Styles
+// Inject Reaction Styles removed and moved to input.css
 (function injectReactionStyles() {
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .reaction-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 4px;
-            min-height: 24px; /* Ensure space isn't zero to prevent jump */
-        }
-        .reaction-container:empty {
-            min-height: 0; 
-            margin-top: 0;
-        }
-        .reaction-badge {
-            background-color: rgba(31, 41, 55, 0.4);
-            border-radius: 12px;
-            padding: 2px 8px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            color: #E5E7EB;
-            border: 1px solid transparent;
-            transition: all 0.2s;
-        }
-        .reaction-badge:hover {
-            background-color: rgba(55, 65, 81, 0.6);
-        }
-        .reaction-badge.my-reaction {
-            background-color: rgba(67, 56, 202, 0.3); /* Indigo tint */
-            border-color: #4F46E5;
-        }
-        .add-reaction-btn {
-            opacity: 0; /* Hidden by default */
-            transition: opacity 0.2s;
-            cursor: pointer;
-            color: #9CA3AF;
-            font-size: 1.1rem;
-            padding: 4px;
-            border-radius: 50%;
-        }
-        .add-reaction-btn:hover {
-            color: #FBBF24;
-            background-color: rgba(255,255,255,0.05);
-        }
-        /* Show button on hover OR if active on mobile (handle via JS/CSS media? simplify to hover for now) */
-        .message-bubble:hover .add-reaction-btn,
-        .message-wrapper:hover .add-reaction-btn {
-            opacity: 1;
-        }
-        
-        /* Mobile: Always slightly visible */
-        @media (max-width: 640px) {
-            .add-reaction-btn {
-                opacity: 0.3;
-            }
-        }
-
-        .reaction-picker-popover {
-            position: absolute;
-            background-color: #1F2937;
-            border: 1px solid #374151;
-            border-radius: 999px;
-            padding: 6px 12px;
-            display: flex;
-            gap: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-            z-index: 50;
-            top: 100%; /* Show below the bubble */
-            margin-top: 8px; /* Spacing */
-            animation: popIn 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .reaction-option {
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: transform 0.1s;
-            line-height: 1;
-        }
-        .reaction-option:hover {
-            transform: scale(1.3);
-        }
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.5) translateY(-10px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .message-bubble {
-            position: relative; /* Context for picker */
-        }
-
-        /* REPLY STYLES */
-        .reply-preview-bar {
-            position: relative; 
-            width: 100%;
-            background-color: #374161; /* Gray-700 +/- shift */
-            background-color: #374151;
-            /* border-top: 1px solid #4B5563; */
-            border-radius: 0.5rem; /* Match Delete Button */
-            padding: 12px 16px; /* Match Delete Button Padding (0.75rem 1rem) */
-            box-sizing: border-box; /* Ensure padding doesn't expand width */
-            
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 40;
-            animation: slideUp 0.2s ease-out;
-        }
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .reply-preview-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            margin-right: 12px;
-        }
-        .reply-to-label {
-            font-size: 0.75rem;
-            color: #9CA3AF;
-        }
-        .reply-to-label b {
-            color: #60A5FA; /* Blue-400 */
-        }
-        #reply-to-text {
-            color: #E5E7EB;
-            font-size: 0.875rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin: 0;
-        }
-        .cancel-reply-btn {
-            background: none;
-            border: none;
-            color: #9CA3AF;
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 50%;
-        }
-        .cancel-reply-btn:hover {
-            background-color: #4B5563;
-            color: #FFFFFF;
-        }
-        .cancel-reply-btn svg {
-            width: 20px;
-            height: 20px;
-        }
-        
-        .reply-quote {
-            display: block;
-            margin-bottom: 6px;
-            padding: 4px 8px;
-            border-left: 3px solid #60A5FA;
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 0 4px 4px 0;
-            font-size: 0.8rem;
-            color: #D1D5DB;
-            cursor: pointer;
-        }
-        .reply-quote-sender {
-            display: block;
-            font-weight: 600;
-            color: #60A5FA;
-            margin-bottom: 2px;
-        }
-        .reply-quote-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: block;
-        }
-        .reply-btn {
-            opacity: 0;
-            transition: opacity 0.2s;
-            cursor: pointer;
-            color: #9CA3AF;
-            font-size: 1rem;
-            padding: 4px;
-            margin: 0 4px;
-        }
-        .message-wrapper:hover .reply-btn,
-        .message-bubble:hover .reply-btn {
-            opacity: 1;
-        }
-        @media (max-width: 640px) {
-            .reply-btn { opacity: 0.5; }
-        }
-    `;
-    document.head.appendChild(style);
+    // Moved to input.css
 })();
 
 function deleteSelectedMessages() {
@@ -909,6 +719,51 @@ function cancelReply() {
         console.warn("Cancel Reply Button not found in DOM during bind attempt.");
     }
 })();
+
+function toggleUserList() {
+    if (userListDrawer) {
+        userListDrawer.classList.toggle('is-open');
+    }
+    if (drawerBackdrop) {
+        drawerBackdrop.classList.toggle('hidden');
+    }
+}
+
+if (drawerBackdrop) {
+    drawerBackdrop.addEventListener('click', toggleUserList);
+}
+
+// --- EMOJI PICKER LOGIC ---
+if (emojiToggleBtn && emojiPickerPopover) {
+    emojiToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPickerPopover.classList.toggle('hidden');
+        
+        // Position the picker above the button
+        const rect = emojiToggleBtn.getBoundingClientRect();
+        emojiPickerPopover.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+        emojiPickerPopover.style.left = `${rect.left}px`;
+    });
+}
+
+if (emojiPickerElement && messageInputDom) {
+    emojiPickerElement.addEventListener('emoji-click', event => {
+        const emoji = event.detail.emoji.unicode;
+        const start = messageInputDom.selectionStart;
+        const end = messageInputDom.selectionEnd;
+        const value = messageInputDom.value;
+        
+        messageInputDom.value = value.substring(0, start) + emoji + value.substring(end);
+        messageInputDom.selectionStart = messageInputDom.selectionEnd = start + emoji.length;
+        messageInputDom.focus();
+    });
+}
+
+document.addEventListener('click', (e) => {
+    if (emojiPickerPopover && !emojiPickerPopover.contains(e.target) && !emojiToggleBtn.contains(e.target)) {
+        emojiPickerPopover.classList.add('hidden');
+    }
+});
 
 // --- REACTION HELPERS ---
 

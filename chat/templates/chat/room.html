@@ -1,714 +1,247 @@
+{% extends 'chat/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html>
 
-<head>
-    <title>Chat Room</title>
+{% block title %}Chat Room - Quick Talk{% endblock %}
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js"></script>
+<style>
+    /* Force text wrapping in message bubbles for long filenames/URLs */
+    .message-bubble p, .message-bubble a, .message-bubble span {
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+        max-width: 100%;
+    }
+    .message-bubble { max-width: 85%; }
+    
+    .hidden-chat-interface { display: none !important; }
+</style>
+{% endblock %}
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+{% block content %}
+<!-- Hidden data for JS -->
+{{ username|json_script:"user-name" }}
+{{ room_slug|json_script:"room-slug" }}
+{{ is_owner|json_script:"is-owner" }}
+{{ creator_username|json_script:"creator-username" }}
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.3/index.js"></script>
-
-    <link rel="stylesheet" href="{% static 'css/room.css' %}">
-
-    <link rel="icon" href="https://placehold.co/16x16/000000/FFFFFF/png?text=C" type="image/png">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
-        integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
-
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <style>
-        /* NEW: Force text wrapping in message bubbles for long filenames/URLs */
-        .message-bubble p,
-        .message-bubble a,
-        .message-bubble span {
-            word-break: break-word;
-            overflow-wrap: anywhere;
-            white-space: pre-wrap;
-            max-width: 100%;
-        }
-
-        /* Ensure the bubble itself doesn't get too wide on small screens */
-        .message-bubble {
-            max-width: 85%;
-        }
-
-        /* Mentions */
-        .mention {
-            color: #60A5FA;
-            /* Blue-400 */
-            font-weight: 600;
-        }
-
-        .mention-me {
-            background-color: rgba(245, 158, 11, 0.2);
-            /* Amber with opacity */
-            color: #FBBF24;
-            /* Amber-400 */
-            padding: 0 4px;
-            border-radius: 4px;
-            border: 1px solid rgba(245, 158, 11, 0.4);
-        }
-
-        /* NEW: Basic style to hide the content */
-        .hidden-chat-interface {
-            display: none !important;
-        }
-
-        /* UPDATED: Style for the request approval overlay */
-        .request-approval-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #111827;
-            /* Deep Charcoal Background */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            text-align: center;
-            padding: 0px;
-            z-index: 10000;
-        }
-
-        .request-approval-overlay h1 {
-            color: #FBBF24;
-            /* Amber color for waiting/request */
-            margin-bottom: 1rem;
-        }
-
-        .request-approval-overlay p {
-            font-size: 1.1rem;
-            color: #9CA3AF;
-            padding: 0 18px;
-            line-height: 28px;
-        }
-
-        /* NEW: Style for request denial message */
-        .denial-message {
-            color: #EF4444;
-            /* Red color for denial */
-            margin-top: 1rem;
-            font-weight: bold;
-        }
-
-        @media (min-width: 360px) and (max-width: 450px) {
-            .request-approval-overlay {
-                padding: 0px;
-            }
-        }
-
-        /* NEW: Mention Suggestions Styles */
-        .mention-suggestions {
-            position: absolute;
-            bottom: 80px;
-            /* Fixed height from bottom since it's in footer now */
-            left: 20px;
-            /* Offset from side */
-            right: 20px;
-            /* Offset from side */
-            width: auto;
-            /* Auto width based on left/right */
-            max-width: 300px;
-            /* Limit width on desktop */
-            min-width: 200px;
-            max-height: 250px;
-            overflow-y: auto;
-            background-color: #1F2937;
-            /* Dark gray */
-            border: 1px solid #374151;
-            border-radius: 8px;
-            box-shadow: 0 -4px 15px -3px rgba(0, 0, 0, 0.5);
-            /* Stronger shadow */
-            z-index: 10000;
-            /* Extremely high Z-index */
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Mobile Adjustments */
-        @media (max-width: 640px) {
-            .mention-suggestions {
-                width: auto;
-                max-width: none;
-                left: 10px;
-                right: 10px;
-                bottom: 70px;
-                /* Slightly lower on mobile to be near keyboard/input */
-            }
-        }
-
-        .mention-suggestions.hidden {
-            display: none !important;
-        }
-
-        .mention-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            color: #E5E7EB;
-            border-bottom: 1px solid #374151;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: background-color 0.15s ease;
-        }
-
-        .mention-item:last-child {
-            border-bottom: none;
-        }
-
-        .mention-item:hover,
-        .mention-item.selected {
-            background-color: #374151;
-        }
-
-        .mention-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-color: #4F46E5;
-            /* Indigo-600 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 14px;
-            color: white;
-            font-weight: 600;
-            flex-shrink: 0;
-        }
-
-        .mention-name {
-            font-weight: 500;
-        }
-
-        /* Ensure input group allows absolute positioning relative to it */
-        .input-group {
-            position: relative;
-        }
-
-        @media (max-width: 640px) {
-            .mention-suggestions {
-                width: 100%;
-                max-width: none;
-                left: 0;
-                right: 0;
-            }
-        }
-    </style>
-</head>
-
-<body class="full-screen-wrapper">
-
+<div class="full-screen-wrapper flex-grow flex items-center justify-center overflow-hidden">
     <div class="main-chat-container {% if not is_owner %}hidden-chat-interface{% endif %}">
-
+        <!-- Header -->
         <header class="chat-header">
             <div class="header-content-wrapper">
                 <div class="roomname-creator">
-                    <h1 id="room-name-display" class="room-title">Loading Room...</h1>
-
+                    <h1 id="room-name-display">Loading Room...</h1>
                     <p id="creator-info" class="creator-info">
                         Created by: <span id="creator-username-display">Connecting...</span>
                     </p>
                 </div>
-
                 <div id="current-user-display" class="user-profile-display">
-
-                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24"
-                        class="user-icon">
-                        <circle cx="12" cy="12" r="12" fill="#ffffff" />
-                        <path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 21v-1a7 7 0 0 1 14 0v1H5z" fill="black"
-                            stroke="white" stroke-width="0.5" />
-                    </svg>
-
+                    <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center border-2 border-slate-800">
+                        <i class="fas fa-user text-white text-xs"></i>
+                    </div>
                     <span id="current-username-span" class="current-username"></span>
                 </div>
-
                 {% if is_owner %}
-                <div class="chat-header-actions">
-                    <button id="request-display-toggle" class="request-toggle-btn" aria-label="View Join Requests">
-                        <div class="btn-content">
-                            <i class="fas fa-bell"></i>
-                            <span class="btn-text">Requests</span>
-                        </div>
-                        <span id="request-count" class="request-badge">0</span>
+                <div class="mt-2">
+                    <button id="request-display-toggle" class="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-lg border border-amber-500/20 transition-all group">
+                        <i class="fas fa-bell group-hover:animate-ring"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Requests</span>
+                        <span id="request-count" class="bg-amber-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">0</span>
                     </button>
                 </div>
                 {% endif %}
-
             </div>
 
-            <div class="voip-hamburger-container">
-                <button id="voip-call-btn"
-                    class="flex-shrink-0 flex items-center justify-center w-11 h-11 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 active:scale-95"
-                    title="Start Voice Call">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
+            <div class="flex items-center gap-3">
+                <button id="video-call-btn" class="w-12 h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-900/20 transition-all transform active:scale-95 group">
+                    <i class="fas fa-video group-hover:animate-pulse"></i>
                 </button>
-
-                <button id="video-call-btn"
-                    class="flex-shrink-0 flex items-center justify-center w-11 h-11 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg shadow-emerald-500/30 transition-all duration-200 active:scale-95"
-                    title="Start Video Call">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
+                <button id="voip-call-btn" class="w-12 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-900/20 transition-all transform active:scale-95 group">
+                    <i class="fas fa-phone-alt group-hover:animate-pulse"></i>
                 </button>
-
-                <button id="hamburger-menu-btn"
-                    class="flex-shrink-0 flex items-center justify-center w-11 h-11 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg border border-slate-700 transition-all duration-200 active:scale-95 shadow-md"
-                    aria-label="Toggle user list">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
+                <button id="hamburger-menu-btn" class="lg:hidden w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-users text-xl"></i>
                 </button>
-
-                <button id="leave-room-btn"
-                    class="flex-shrink-0 flex items-center justify-center w-11 h-11 bg-red-500 text-white rounded-lg transition-all duration-200 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 border border-transparent"
-                    title="Leave Room">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
+                <button id="leave-room-btn" class="hidden md:flex items-center gap-2 px-4 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 rounded-xl border border-rose-500/20 transition-all font-bold text-sm">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Leave
                 </button>
             </div>
         </header>
 
-        <div id="requests-panel" class="requests-sidebar hidden-panel">
-            <div class="sidebar-header">
-                <div class="header-title-group">
-                    <i class="fas fa-user-plus request-icon"></i>
-                    <h3>Join Requests</h3>
-                </div>
-                <button id="close-requests-btn" class="close-sidebar-btn" aria-label="Close Panel">
-                    <i class="fas fa-times"></i>
-                </button>
+        <!-- Main Area -->
+        <div class="flex-grow flex overflow-hidden relative">
+            <!-- Chat Log -->
+            <div id="chat-log" class="chat-log-box custom-scrollbar">
+                <!-- Messages injected via JS -->
             </div>
+            
+            <!-- Scroll to bottom button -->
+            <button id="scroll-to-bottom-btn" class="fixed bottom-24 right-8 w-10 h-10 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center transition-all opacity-0 pointer-events-none z-50">
+                <i class="fas fa-arrow-down"></i>
+            </button>
 
-            <div id="pending-requests-container">
-            </div>
+            <!-- User List Drawer -->
+            <aside id="user-list-drawer" class="user-list-drawer lg:block">
+                <h2 class="user-list-title">
+                    <span>Participants</span>
+                    <span id="user-count" class="text-xs bg-slate-800 px-2 py-1 rounded-full text-slate-400 font-normal">0</span>
+                </h2>
+                <div id="user-list-container" class="space-y-1">
+                    <!-- Users injected via JS -->
+                </div>
+                <button id="mobile-leave-btn" class="md:hidden w-full mt-8 py-3 bg-rose-600/10 text-rose-500 border border-rose-500/20 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Leave Room
+                </button>
+            </aside>
+
+            <!-- Drawer Backdrop -->
+            <div id="drawer-backdrop" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[999] hidden lg:hidden"></div>
         </div>
 
-        <div class="chat-area-and-drawer-wrapper">
+        <!-- Footer -->
+        <footer class="chat-footer">
+            <div id="typing-indicator" class="typing-indicator-container hidden"></div>
+            
+            <!-- Mention Suggestions -->
+            <div id="mention-suggestions" class="mention-suggestions hidden"></div>
 
-            <div class="chat-log-wrapper"
-                style="position: relative; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-
-                <!-- NEW: Join Call Status Bar (Hidden by default) -->
-                <div id="join-call-bar" class="join-call-bar hidden">
-                    <div class="join-call-info">
-                        <div class="pulsing-dot"></div>
-                        <span>Ongoing Call...</span>
+            <div class="flex flex-col gap-3">
+                <!-- Reply Bar -->
+                <div id="reply-preview" class="hidden flex items-center justify-between p-3 bg-indigo-600/10 border-l-4 border-indigo-500 rounded-r-xl animate-slideUp">
+                    <div class="flex flex-col gap-1 overflow-hidden">
+                        <span class="text-[10px] uppercase font-bold text-indigo-400">Replying to <span id="reply-to-user" class="text-white"></span></span>
+                        <p id="reply-to-text" class="text-xs text-slate-300 truncate"></p>
                     </div>
-                    <button id="join-call-btn" class="join-call-action-btn">
-                        Join Call
+                    <button id="cancel-reply-btn" class="p-2 text-slate-500 hover:text-white transition-colors">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
 
-                <div id="chat-log" class="chat-log-box hide-scrollbar" style="flex: 1;">
-                </div>
-
-                <button id="scroll-to-bottom-btn" aria-label="Scroll to bottom">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                </button>
-            </div>
-
-            <div id="user-list-drawer" class="user-list-drawer">
-                <h3 class="user-list-title">Participants (<span id="user-count">0</span>)</h3>
-                <ul id="user-list-container" class="user-list">
-                </ul>
-            </div>
-
-            <div id="drawer-backdrop" class="drawer-backdrop"></div>
-
-        </div>
-
-
-        <footer class="chat-footer" style="position: relative;"> <!-- Ensure footer is relative context -->
-            <!-- NEW: Mention Suggestions Popup - moved to root of footer for z-index safety -->
-            <div id="mention-suggestions" class="mention-suggestions hidden">
-                <!-- Items will be injected dynamically -->
-            </div>
-
-            <div id="typing-indicator" class="typing-indicator-container hidden">
-            </div>
-
-            <div class="input-group">
-
-                <button id="delete-selected-btn" class="delete-button hidden">
-                    Delete Selected Messages
-                </button>
-
-                <!-- NEW: Reply Preview Bar (Moved here for stacking) -->
-                <div id="reply-preview-bar" class="reply-preview-bar hidden">
-                    <div class="reply-preview-content">
-                        <span class="reply-to-label">Replying to <b id="reply-to-sender"></b></span>
-                        <p id="reply-to-text" class="truncate-text"></p>
-                    </div>
-                    <button id="cancel-reply-btn" class="cancel-reply-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="message-input-container">
-
-                    <div id="emoji-picker-container" class="emoji-picker-container">
-                        <!-- The emoji picker component is a custom HTML tag -->
-                        <emoji-picker></emoji-picker>
-                    </div>
-
-                    <div id="gif-picker-container" class="gif-picker-container hidden">
-                        <div class="gif-search-wrapper">
-                            <input type="text" id="gif-search-input" placeholder="Search GIPHY...">
-                            <button id="close-gif-picker">&times;</button>
-                        </div>
-                        <div id="gif-results" class="gif-results-grid">
-                            <!-- GIFs will be loaded here -->
-                        </div>
-                        <div class="giphy-attribution">
-                            <img src="https://static.okicdn.com/giphy/giphy-attribution-mark.png"
-                                alt="Powered by GIPHY">
-                        </div>
-                    </div>
-
+                <div class="flex gap-3 items-end">
                     <div class="emoji-input-container">
-                        <!-- NEW: Emoji Toggle Button -->
-                        <button id="emoji-toggle-btn" aria-label="Toggle Emoji Picker">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                                <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                                <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                            </svg>
+                        <button id="emoji-toggle-btn" class="p-3 text-slate-500 hover:text-indigo-400 transition-colors">
+                            <i class="far fa-smile text-xl"></i>
                         </button>
-
-                        <input id="chat-message-input" type="text" placeholder="Type your message..."
-                            class="chat-input-base message-input">
-
-                        <!-- NEW: GIF Toggle Button -->
-                        <button id="gif-toggle-btn" aria-label="Toggle GIF Picker" class="gif-toggle-btn">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <polyline points="9 12 9 12"></polyline>
-                                <path d="M7 10h3v4H7z"></path>
-                                <path d="M14 10h3"></path>
-                                <path d="M14 14h3"></path>
-                                <path d="M14 12h2"></path>
-                            </svg>
-                        </button>
+                        <input id="chat-message-input" type="text" class="message-input" placeholder="Type a message or @mention someone...">
+                        <label for="attachment-input" class="p-3 text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors">
+                            <i class="fas fa-paperclip text-lg"></i>
+                            <input id="attachment-input" type="file" class="hidden">
+                        </label>
                     </div>
-
-
-                    <!-- Attachment Button -->
-                    <button id="attachment-btn" aria-label="Attach File"
-                        style="color: #9CA3AF; background: none; border: none; cursor: pointer;">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor" width="22" height="22">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
+                    <button id="chat-message-submit" class="w-12 h-12 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/20 transition-all transform active:scale-95 group">
+                        <i class="fas fa-paper-plane group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"></i>
                     </button>
-                    <input type="file" id="file-input" style="display: none;">
-
-                    <!-- <input id="chat-message-submit" type="button" value="Send" class="chat-button send-button"> -->
-                    <button id="chat-message-submit" class="send-button" type="submit">
-                        <span>Send</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18"
-                            height="18">
-                            <path
-                                d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                        </svg>
+                </div>
+                <div id="attachment-preview" class="hidden flex items-center gap-3 p-2 bg-slate-800/50 rounded-xl border border-slate-700">
+                    <div id="file-icon" class="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center text-slate-400 text-xs font-bold uppercase"></div>
+                    <div class="flex-grow overflow-hidden">
+                        <p id="file-name" class="text-xs text-slate-200 truncate font-medium"></p>
+                        <p id="file-size" class="text-[10px] text-slate-500"></p>
+                    </div>
+                    <button id="remove-attachment" class="p-2 text-slate-500 hover:text-rose-400 transition-colors">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
         </footer>
     </div>
 
-    {% if not is_owner %}
-    <div id="request-overlay" class="request-approval-overlay">
-        <div class="request-card">
-            <div class="icon-pulse">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
-                    stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <line x1="19" y1="8" x2="19" y2="14"></line>
-                    <line x1="22" y1="11" x2="16" y2="11"></line>
-                </svg>
+    <!-- Join Requests Overlay (Owner Only) -->
+    {% if is_owner %}
+    <div id="request-overlay" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[11000] hidden items-center justify-center p-4">
+        <div id="requests-panel" class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-white flex items-center gap-3">
+                    <i class="fas fa-user-plus text-amber-500"></i>
+                    Join Requests
+                </h2>
+                <button id="close-requests-btn" class="p-2 text-slate-500 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
             </div>
-            <h1>Request Access</h1>
-            <p id="overlay-status-message">This room is private. Send a request to the owner to join the conversation.
-            </p>
-
-            <button id="send-join-request-btn" class="hero-request-btn">
-                <span>Send Join Request</span>
-                <i class="fas fa-paper-plane"></i>
-            </button>
-
-            <p id="denial-message-display" class="denial-message" style="display: none;">
-                Access Denied. Redirecting to lobby...
-            </p>
+            <div id="pending-requests-container" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                <!-- Requests injected via JS -->
+            </div>
         </div>
     </div>
     {% endif %}
 
-    {{ room_slug|json_script:"room-slug" }}
-    {{ username|json_script:"user-name" }}
-    {{ is_owner|json_script:"is-owner" }}
-    {{ creator_username|json_script:"creator-username" }}
-
-    <div id="delete-modal" class="modal-backdrop">
-        <div class="delete-popup" style="max-width: 25rem;">
-
-            <h3 id="modal-title" style="font-size: 1.125rem; line-height: 1.75rem; font-weight: 700; color: white;">
-                Confirm Deletion
-            </h3>
-            <div style="margin-top: 0.5rem;">
-                <p id="modal-body-text" style="font-size: 0.875rem; color: #9CA3AF;">
-                    You have selected <span id="message-count" style="font-weight: 600; color: #EF4444;"></span>
-                    message(s).
-                    Choose how you want to delete them.
-                </p>
+    <!-- Waiting for Approval Overlay -->
+    <div id="approval-overlay" class="request-approval-overlay hidden animate-fadeIn">
+        <div class="text-center space-y-6 max-w-md">
+            <div class="relative inline-block">
+                <div class="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center border-2 border-amber-500/20">
+                    <i class="fas fa-hourglass-half text-4xl text-amber-500 animate-spin-slow"></i>
+                </div>
+                <div class="absolute -bottom-2 -right-2 w-8 h-8 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-xs font-black animate-bounce">
+                    !
+                </div>
             </div>
-
-            <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
-                <button id="delete-for-all-btn"
-                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); padding: 0.75rem 1rem; background-color: #DC2626; font-size: 1rem; font-weight: 500; color: white; cursor: pointer;">
-                    Delete for Everyone
-                </button>
-                <button id="delete-for-me-btn"
-                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; border: 1px solid #4B5563; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); padding: 0.75rem 1rem; background-color: #374151; font-size: 1rem; font-weight: 500; color: white; cursor: pointer;">
-                    Delete for Me Only
-                </button>
+            <h1 class="text-3xl font-black text-white">Access Pending</h1>
+            <p class="text-slate-400 leading-relaxed">
+                You've sent a request to join this room. Please wait for the owner to approve your access.
+            </p>
+            <div id="denial-message" class="hidden p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-500 font-bold">
+                Your request was denied.
             </div>
-            <div style="margin-top: 0.75rem;">
-                <button id="delete-cancel-btn"
-                    style="width: 100%; display: inline-flex; justify-content: center; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #9CA3AF; cursor: pointer;">
-                    Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="leave-modal" class="modal-backdrop">
-        <div class="modal-content-card">
-
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: white;">
-                Confirm Exit
-            </h3>
-            <div style="margin-top: 0.5rem;">
-                <p style="font-size: 1rem; color: #9CA3AF;">
-                    Are you sure you want to leave the chat room? You won't be able to review messages when rejoin...
-                </p>
-            </div>
-
-            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-start;">
-                <button id="leave-cancel-btn"
-                    style="padding: 0.75rem 1.5rem; background-color: #374151; color: white; border: 1px solid #4B5563; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
-                    Cancel
-                </button>
-                <button id="leave-confirm-btn"
-                    style="padding: 0.75rem 1.5rem; background-color: #EF4444; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
-                    Leave Room
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="connection-lost-modal" class="modal-backdrop">
-        <div class="modal-content-card reload-modal-card">
-
-            <h3 id="connection-modal-title">
-                Connection Lost
-            </h3>
-            <div>
-                <p id="connection-modal-body">
-                    We failed to re-establish a connection after multiple attempts. Please check your internet
-                    connection and try manually refreshing the page.
-                </p>
-            </div>
-
-            <div class="modal-button-group">
-                <button id="connection-dismiss-btn" class="chat-button send-button">
-                    Dismiss
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ACTIVE CALL INTERFACE OVERLAY -->
-    <div id="call-interface-overlay" class="call-interface-overlay hidden">
-        <div class="call-interface-content">
-            <!-- Minimize Button -->
-            <button id="minimize-call-btn" class="minimize-call-btn" title="Minimize Call Overlay">
-                <i class="fas fa-compress-alt"></i>
+            <button onclick="window.location.href='/chat/lobby/'" class="mt-8 px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl transition-all border border-slate-700">
+                Back to Lobby
             </button>
-
-            <!-- Call Pulse Animation -->
-            <div class="call-avatar-container">
-                <div class="call-pulse-ring"></div>
-                <div class="call-pulse-ring delay-1"></div>
-                <div class="call-pulse-ring delay-2"></div>
-                <div class="call-avatar">
-                    <i class="fas fa-phone-alt"></i>
-                </div>
-            </div>
-
-            <!-- Call Info -->
-            <div class="call-header-info">
-                <h2 id="call-status-text">Ongoing Voice Call</h2>
-                <p id="call-participant-name">All Participants</p>
-                <div id="call-timer" class="call-timer">00:00</div>
-            </div>
-
-            <!-- Sound Visualizer Bars -->
-            <div class="sound-visualizer">
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-            </div>
-
-            <!-- Actions Container -->
-            <div id="call-actions-container" class="call-actions-container">
-                <!-- Ongoing Call Actions (visible when in a call) -->
-                <div id="ongoing-call-actions" class="call-actions-group">
-                    <button id="mute-call-btn" class="call-btn secondary" title="Mute Microphone">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-
-                    <button id="hangup-call-btn" class="call-btn danger" title="End Call">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-
-                    <button id="speaker-call-btn" class="call-btn secondary" title="Speaker">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                </div>
-
-                <!-- Incoming Call Actions (visible when receiving a call) -->
-                <div id="incoming-call-actions" class="call-actions-group hidden">
-                    <button id="accept-call-btn" class="call-btn success" title="Accept Call">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                    <button id="deny-call-btn" class="call-btn danger" title="Deny Call">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
+</div>
 
-    <!-- ACTIVE VIDEO CALL INTERFACE OVERLAY -->
-    <div id="video-call-overlay" class="video-call-overlay hidden">
-        <div class="video-call-content">
-            <!-- Participant Count Badge -->
-            <div class="video-call-participant-count">
-                <i class="fas fa-users"></i>
-                <span id="video-participant-count">1</span>
-            </div>
+<!-- Emoji Picker Popover -->
+<div id="emoji-picker-popover" class="fixed z-[12000] hidden shadow-2xl animate-scaleIn">
+    <emoji-picker class="dark"></emoji-picker>
+</div>
 
-            <!-- Minimize Button -->
-            <button id="minimize-video-call-btn" class="minimize-call-btn" title="Minimize Video Call">
-                <i class="fas fa-compress-alt"></i>
-            </button>
+<!-- VOIP Call Modal -->
+<div id="voip-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[15000] hidden flex-col items-center justify-center p-8 text-center animate-fadeIn">
+    <!-- VOIP Content -->
+</div>
+{% endblock %}
 
-            <!-- Minimized Pagination Buttons (Up) -->
-            <!-- <button id="video-page-up-btn" class="video-pagination-btn up" title="Previous Page">
-                <i class="fas fa-chevron-up"></i>
-            </button> -->
+{% block extra_js %}
+<script src="{% static 'js/room_utils.js' %}"></script>
+<script src="{% static 'js/room_config.js' %}"></script>
+<script src="{% static 'js/room_ui.js' %}"></script>
+<script src="{% static 'js/room_socket.js' %}"></script>
+<script src="{% static 'js/room_gif.js' %}"></script>
+<script src="{% static 'js/room_main.js' %}"></script>
+<script src="{% static 'js/ringtone.js' %}"></script>
 
-            <!-- Video Grid Container -->
-            <div id="video-grid" class="video-grid">
-                <!-- Local Video (As a Tile) -->
-                <div class="video-tile local-tile" id="video-tile-local">
-                    <video id="local-video" autoplay playsinline muted></video>
-                    <div class="video-tile-overlay">
-                        <span class="video-tile-name">You</span>
-                        <span class="video-tile-status" id="local-mic-status">
-                            <i class="fas fa-microphone"></i>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Minimized Pagination Buttons (Down) -->
-            <!-- <button id="video-page-down-btn" class="video-pagination-btn down" title="Next Page">
-                <i class="fas fa-chevron-down"></i>
-            </button> -->
-
-            <!-- Video Call Info -->
-            <div class="video-call-info">
-                <h2 id="video-call-status-text">Ongoing Video Call</h2>
-                <div id="video-call-timer" class="call-timer">00:00</div>
-            </div>
-
-            <!-- Video Call Actions -->
-            <div id="video-call-actions-container" class="call-actions-container">
-                <!-- Ongoing Video Call Actions -->
-                <div id="ongoing-video-call-actions" class="call-actions-group">
-                    <button id="mute-video-call-btn" class="call-btn secondary" title="Mute Microphone">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-
-                    <button id="toggle-camera-btn" class="call-btn secondary" title="Toggle Camera">
-                        <i class="fas fa-video"></i>
-                    </button>
-
-                    <button id="hangup-video-call-btn" class="call-btn danger" title="End Video Call">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-
-                <!-- Incoming Video Call Actions -->
-                <div id="incoming-video-call-actions" class="call-actions-group hidden">
-                    <button id="accept-video-call-btn" class="call-btn success" title="Accept Video Call">
-                        <i class="fas fa-video"></i>
-                    </button>
-                    <button id="deny-video-call-btn" class="call-btn danger" title="Deny Video Call">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modular JS Files -->
-    <script src="{% static 'js/ringtone.js' %}"></script>
-    <script src="{% static 'js/room_config.js' %}"></script>
-    <script src="{% static 'js/room_utils.js' %}"></script>
-    <script src="{% static 'js/room_ui.js' %}"></script>
-    <script src="{% static 'js/room_socket.js' %}"></script>
-    <script src="{% static 'js/room_gif.js' %}"></script>
-    <script src="{% static 'js/room_main.js' %}"></script>
-</body>
-
-</html>
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    @keyframes ring {
+        0%, 100% { transform: rotate(0); }
+        25% { transform: rotate(15deg); }
+        75% { transform: rotate(-15deg); }
+    }
+    .animate-ring { animation: ring 0.5s ease-in-out infinite; }
+    
+    .animate-spin-slow { animation: spin 3s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+    
+    @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    .animate-scaleIn { animation: scaleIn 0.2s ease-out forwards; }
+</style>
+{% endblock %}

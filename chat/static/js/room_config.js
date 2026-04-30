@@ -3,85 +3,88 @@
 // ===================================================================
 
 // --- CONFIGURATION AND DATA CONTEXT ---
-const fixedUsername = JSON.parse(document.getElementById('user-name').textContent);
-const creatorUsernameContext = JSON.parse(document.getElementById('creator-username').textContent);
-const roomSlug = JSON.parse(document.getElementById('room-slug').textContent);
-const isOwner = JSON.parse(document.getElementById('is-owner').textContent);
+var fixedUsername = JSON.parse(document.getElementById('user-name').textContent);
+var creatorUsernameContext = JSON.parse(document.getElementById('creator-username').textContent);
+var roomSlug = JSON.parse(document.getElementById('room-slug').textContent);
+var isOwner = JSON.parse(document.getElementById('is-owner').textContent);
 
 // --- DOM ELEMENT SELECTION ---
-const messageInputDom = document.querySelector('#chat-message-input');
-const submitButtonDom = document.querySelector('#chat-message-submit');
-const chatLogDom = document.querySelector('#chat-log');
-const fileInputDom = document.querySelector('#file-input');
-const attachmentBtn = document.querySelector('#attachment-btn');
-const deleteSelectedBtn = document.querySelector('#delete-selected-btn');
-const leaveRoomBtn = document.querySelector('#leave-room-btn');
+var messageInputDom = document.querySelector('#chat-message-input');
+var submitButtonDom = document.querySelector('#chat-message-submit');
+var chatLogDom = document.querySelector('#chat-log');
+var fileInputDom = document.querySelector('#file-input');
+var attachmentBtn = document.querySelector('#attachment-btn');
+var deleteSelectedBtn = document.querySelector('#delete-selected-btn');
+var leaveRoomBtn = document.querySelector('#leave-room-btn');
 
 // Header Display
-const roomNameDisplay = document.querySelector('#room-name-display');
-const creatorUsernameDisplay = document.querySelector('#creator-username-display');
-const currentUsernameSpan = document.querySelector('#current-username-span');
-const userCountSpan = document.querySelector('#user-count');
-const typingIndicatorDom = document.querySelector('#typing-indicator');
+var roomNameDisplay = document.querySelector('#room-name-display');
+var creatorUsernameDisplay = document.querySelector('#creator-username-display');
+var currentUsernameSpan = document.querySelector('#current-username-span');
+var userCountSpan = document.querySelector('#user-count');
+var typingIndicatorDom = document.querySelector('#typing-indicator');
 
 // User List and Mobile Menu Elements
-const hamburgerMenuBtn = document.querySelector('#hamburger-menu-btn');
-const userListDrawer = document.querySelector('#user-list-drawer');
-const userListContainer = document.querySelector('#user-list-container');
+var hamburgerMenuBtn = document.querySelector('#hamburger-menu-btn');
+var userListDrawer = document.querySelector('#user-list-drawer');
+var userListContainer = document.querySelector('#user-list-container');
+var drawerBackdrop = document.querySelector('#drawer-backdrop');
 
 // Modal Elements (Deletion Modals)
-const deleteModal = document.querySelector('#delete-modal');
-const messageCountSpan = document.querySelector('#message-count');
-const deleteForAllBtn = document.querySelector('#delete-for-all-btn');
-const deleteForMeBtn = document.querySelector('#delete-for-me-btn');
-const deleteCancelBtn = document.querySelector('#delete-cancel-btn');
+var deleteModal = document.querySelector('#delete-modal');
+var messageCountSpan = document.querySelector('#message-count');
+var deleteForAllBtn = document.querySelector('#delete-for-all-btn');
+var deleteForMeBtn = document.querySelector('#delete-for-me-btn');
+var deleteCancelBtn = document.querySelector('#delete-cancel-btn');
 
 // Connection Lost Modals
-const connectionLostModal = document.querySelector('#connection-lost-modal');
-const connectionReloadBtn = document.querySelector('#connection-reload-btn');
-const connectionCancelBtn = document.querySelector('#connection-cancel-btn');
+var connectionLostModal = document.querySelector('#connection-lost-modal');
+var connectionReloadBtn = document.querySelector('#connection-reload-btn');
+var connectionCancelBtn = document.querySelector('#connection-cancel-btn');
 
 // Request/Access Elements
-const sendJoinRequestBtn = document.querySelector('#send-join-request-btn');
-const requestOverlay = document.querySelector('#request-overlay');
-const overlayStatusMessage = document.querySelector('#overlay-status-message');
-const denialMessageDisplay = document.querySelector('#denial-message-display');
-const mainChatContainer = document.querySelector('.main-chat-container');
+var sendJoinRequestBtn = document.querySelector('#send-join-request-btn');
+var requestOverlay = document.querySelector('#request-overlay');
+var overlayStatusMessage = document.querySelector('#overlay-status-message');
+var denialMessageDisplay = document.querySelector('#denial-message-display');
+var mainChatContainer = document.querySelector('.main-chat-container');
 
-const requestsPanel = document.getElementById('requests-panel');
-const closeRequestsBtn = document.getElementById('close-requests-btn');
-const requestCountSpan = document.getElementById('request-count');
-const requestToggleBtn = document.getElementById('request-display-toggle');
-const pendingRequestsContainer = document.getElementById('pending-requests-container');
-const bellIconDom = document.querySelector('#request-display-toggle .fas.fa-bell');
-const creatorInfoContainer = document.querySelector('#creator-info');
-const currentUserDisplay = document.querySelector('#current-user-display');
-const emojiToggleBtn = document.getElementById('emoji-toggle-btn');
-const pickerContainer = document.getElementById('emoji-picker-container');
-const emojiPicker = pickerContainer ? pickerContainer.querySelector('emoji-picker') : null; // Safely select emoji picker
+var requestsPanel = document.getElementById('requests-panel');
+var closeRequestsBtn = document.getElementById('close-requests-btn');
+var requestCountSpan = document.getElementById('request-count');
+var requestToggleBtn = document.getElementById('request-display-toggle');
+var pendingRequestsContainer = document.getElementById('pending-requests-container');
+var bellIconDom = document.querySelector('#request-display-toggle .fas.fa-bell');
+var creatorInfoContainer = document.querySelector('#creator-info');
+var currentUserDisplay = document.querySelector('#current-user-display');
+var emojiToggleBtn = document.getElementById('emoji-toggle-btn');
+var emojiPickerPopover = document.getElementById('emoji-picker-popover');
+var emojiPickerElement = document.querySelector('emoji-picker');
+var pickerContainer = document.getElementById('emoji-picker-container');
+var emojiPicker = pickerContainer ? pickerContainer.querySelector('emoji-picker') : null; // Safely select emoji picker
 
 // --- STATE VARIABLES ---
-let selectedMessageIds = [];
-let messageOwnership = {};
-let isUserLeaving = false;
-let chatSocket = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-let isReceivingHistory = false;
-let isTyping = false;
-let isAccessGranted = isOwner;
-let isPendingUser = false;
-let typingUsers = new Set();
-let isAwaitingServerSync = false;
-let isFatalError = false; // Flag to halt generic reconnect/load processes
-let pickerOpen = false;
-let selectedCallParticipants = new Set();
+var selectedMessageIds = [];
+var messageOwnership = {};
+var isUserLeaving = false;
+var chatSocket = null;
+var reconnectAttempts = 0;
+var MAX_RECONNECT_ATTEMPTS = 5;
+var isReceivingHistory = false;
+var isTyping = false;
+var isAccessGranted = isOwner;
+var isPendingUser = false;
+var typingUsers = new Set();
+var isAwaitingServerSync = false;
+var isFatalError = false; // Flag to halt generic reconnect/load processes
+var pickerOpen = false;
+var selectedCallParticipants = new Set();
 
 // Ensure global accessibility
 window.availableParticipants = [];
 
 // --- MENTION DOM ---
-const mentionSuggestionsDom = document.querySelector('#mention-suggestions');
+var mentionSuggestionsDom = document.querySelector('#mention-suggestions');
 
 // Initial state checks
 if (document.getElementById('is-requester')) {

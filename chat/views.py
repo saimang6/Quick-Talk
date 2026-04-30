@@ -37,6 +37,46 @@ def get_rooms_json(request):
 
 @require_POST
 @csrf_exempt
+def create_room_json(request):
+    """API endpoint to create a new room and return JSON."""
+    import json
+    import uuid
+    try:
+        data = json.loads(request.body)
+        room_name = data.get('room_name')
+        secret_number = data.get('secret_number')
+        username = data.get('username')
+
+        if not room_name or not username:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+        # Generate a unique slug
+        base_slug = room_name.lower().replace(' ', '-')
+        unique_slug = f"{base_slug}-{str(uuid.uuid4())[:8]}"
+        
+        # Check if room already exists with same name (optional, but good)
+        if Room.objects.filter(name=room_name).exists():
+             # We can allow multiple rooms with same name but different slugs, 
+             # but let's make the name unique for now as per model
+             return JsonResponse({'error': 'Room name already exists'}, status=400)
+
+        room = Room.objects.create(
+            name=room_name,
+            slug=unique_slug,
+            owner_username=username,
+            secret_number=secret_number
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'slug': room.slug,
+            'name': room.name
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@require_POST
+@csrf_exempt
 def upload_attachment(request, room_slug):
     if 'file' not in request.FILES:
         return JsonResponse({'error': 'No file provided'}, status=400)

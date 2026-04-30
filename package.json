@@ -1,0 +1,25 @@
+{
+  "name": "django-chat-app",
+  "version": "1.0.0",
+  "description": "Quick Talk is a fast, secure, and simple way to connect. Join a room to chat instantly with friends, or start a voice call with just one click!",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "npx tailwindcss -i ./chat/static/src/input.css -o ./chat/static/css/tailwind.css",
+    "watch:css": "npx tailwindcss -i ./chat/static/src/input.css -o ./chat/static/css/tailwind.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saimang6/Quick-Talk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/saimang6/Quick-Talk/issues"
+  },
+  "homepage": "https://github.com/saimang6/Quick-Talk#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

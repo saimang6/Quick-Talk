@@ -269,7 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Wire up DOM elements
-if (hamburgerMenuBtn) hamburgerMenuBtn.addEventListener('click', toggleUserList);
+if (hamburgerMenuBtn) {
+    hamburgerMenuBtn.addEventListener('click', toggleUserList);
+}
 if (sendJoinRequestBtn) sendJoinRequestBtn.addEventListener('click', sendJoinRequest);
 if (requestsPanel && requestToggleBtn && closeRequestsBtn) {
     requestToggleBtn.addEventListener('click', () => requestsPanel.classList.toggle('hidden-panel'));

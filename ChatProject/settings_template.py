@@ -34,6 +34,11 @@ ALLOWED_HOSTS = [
     '*' # <-- Allows any device on your local network
 ]
 
+# CSRF configuration for ngrok or other domains
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.io",
+]
 
 # Application definition
 

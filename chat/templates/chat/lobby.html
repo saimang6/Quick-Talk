@@ -1,590 +1,235 @@
-<!DOCTYPE html>
-<html>
+{% extends 'chat/base.html' %}
+{% load static %}
 
-<head>
-    <title>Chat Lobby</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
-        /* Base Styling */
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: #111827;
-            color: white;
-            flex-direction: column;
-            padding: 1rem;
-        }
+{% block title %}Chat Lobby - Quick Talk{% endblock %}
 
-        .lobby-container {
-            background-color: #1F2937;
-            padding: 2rem;
-            margin-bottom: 1rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 600px;
-        }
-
-        h1,
-        h2 {
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-
-        .room-list {
-            margin-top: 1.5rem;
-        }
-
-        /* Room List Item Styling */
-        .room-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.75rem;
-            background-color: #374151;
-            border-radius: 0.5rem;
-            transition: background-color 0.2s;
-        }
-
-        .room-item:hover {
-            background-color: #4B5563;
-        }
-
-        .room-item span {
-            font-weight: 600;
-            color: #D1D5DB;
-            width: 130px;
-        }
-
-        /* Join Request Button Styling */
-        .join-request-button {
-            padding: 0.5rem 1rem;
-            background-color: #FBBF24;
-            /* Amber color for request */
-            color: #111827;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            border-radius: 0.5rem;
-            font-weight: bold;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-
-        .join-request-button:hover {
-            background-color: #EAB308;
-            transform: translateY(-1px);
-        }
-
-
-        /* Create Form Styling */
-        .create-form {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .create-form label {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: #D1D5DB;
-            margin-bottom: 0.25rem;
-        }
-
-        .create-form input[type="text"] {
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
-            border: 2px solid #4B5563;
-            border-radius: 0.5rem;
-            background-color: #374151;
-            color: white;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .create-form input[type="text"]:focus {
-            border-color: #4F46E5;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5);
-        }
-
-        .create-form button {
-            padding: 0.75rem 1.5rem;
-            background-color: #10B981;
-            color: white;
-            border: none;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-
-        .create-form button:hover {
-            background-color: #059669;
-            transform: translateY(-1px);
-        }
-
-        /* Leave Lobby Button Styling */
-        .leave-lobby-button {
-            display: block;
-            width: 100%;
-            padding: 0.75rem 1.5rem;
-            background-color: #DC2626;
-            color: white;
-            border: none;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 1rem;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-
-        .leave-lobby-button:hover {
-            background-color: #B91C1C;
-            transform: translateY(-1px);
-        }
-
-        .swal2-input-label {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 1em auto 0;
-            text-align: center;
-        }
-
-        /* Responsive Media Queries */
-        @media (max-width: 640px) {
-            .lobby-container {
-                max-width: 80%;
-                padding: 1.5rem;
-                margin: 0px 10px 15px 10px;
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            h2 {
-                font-size: 1.25rem;
-            }
-
-            .room-item {
-                flex-direction: row;
-                align-items: center;
-                gap: 0.5rem;
-            }
-        }
-
-        /* Custom SweetAlert2 Mobile Styles */
-        .swal2-shown .lobby-container,
-        .swal2-shown .custom-alert-toast {
-            display: none !important;
-        }
-
-        .swal2-styled.swal2-confirm.custom-purple-btn {
-            background-color: #4F46E5 !important;
-            /* Tailwind indigo-600/700 equivalent */
-            border: 1px solid #6366F1 !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            font-weight: 600;
-            color: #ffffff;
-            /* Ensure text is white */
-            transition: background-color 0.15s ease-in-out;
-        }
-
-        .swal2-styled.swal2-confirm.custom-purple-btn:focus {
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5) !important;
-            /* Focus ring */
-        }
-
-        .swal2-styled.swal2-confirm.custom-purple-btn:hover {
-            background-color: #4338CA !important;
-            /* Slightly darker indigo on hover */
-        }
-
-        /* 🎯 MEDIA QUERY FOR MOBILE SIZES (360px to 450px) */
-        @media (min-width: 360px) and (max-width: 450px) {
-
-            /* Target the main SweetAlert2 modal box */
-            .mobile-alert-responsive-container .swal2-popup {
-                width: 85% !important;
-                /* Make it wider to fill the screen better */
-            }
-
-            /* Target the title text */
-            .mobile-alert-responsive-container .swal2-title {
-                font-size: 1.1rem !important;
-            }
-
-            /* Target the main content text */
-            .mobile-alert-responsive-container .swal2-html-container {
-                font-size: 0.9rem !important;
-            }
-
-            /* Target the confirmation button */
-            .mobile-alert-responsive-container .swal2-confirm {
-                font-size: 0.95rem !important;
-                padding: 0.6em 1.2em !important;
-            }
-
-            .custom-alert-toast {
-                font-size: 15px;
-                text-align: center;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div class="lobby-container">
-        <h1>Welcome to the Chat Lobby!</h1>
-        <!-- <p style="text-align: center; color: #9CA3AF;">Logged in as: <strong>{{ username }}</strong></p> -->
-
-        <p style="text-align: center; color: #9CA3AF;">Logged in as: <strong><span
-                    id="display-username">Loading...</span></strong></p>
-
-        <input type="hidden" id="current-username" value="">
-
-        <hr style="border-color:#4B5563; margin-top: 1rem; margin-bottom: 2rem;">
-
-        <h2>Existing Rooms</h2>
-        <div class="room-list" id="room-list-container">
-            {% for room in rooms %}
-            <div class="room-item">
-                <span>{{ room.name }}</span>
-                <button class="join-request-button" data-room-slug="{{ room.slug }}"
-                    data-room-url="{% url 'room' room_slug=room.slug %}" data-room-owner="{{ room.owner_username }}">
-                    Enter Room
-                </button>
-            </div>
-            {% empty %}
-            <p style="text-align: center; color: #9CA3AF;">No rooms available. Be the first to create one!</p>
-            {% endfor %}
+{% block content %}
+<div class="flex-grow flex items-center justify-center p-4">
+    <div class="w-full max-auto max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <!-- Header Section -->
+        <div class="p-8 pb-6 border-b border-slate-800">
+            <h1 class="text-3xl font-extrabold text-center bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent mb-4">
+                Chat Lobby
+            </h1>
+            <p class="text-center text-slate-400">
+                Logged in as: <span id="display-username" class="font-bold text-indigo-400">Loading...</span>
+            </p>
+            <input type="hidden" id="current-username" value="">
         </div>
 
-        <hr style="border-color:#4B5563; margin-top: 2rem; margin-bottom: 2rem;">
+        <!-- Room List Section -->
+        <div class="p-8 py-6">
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <span class="w-2 h-6 bg-indigo-500 rounded-full"></span>
+                Existing Rooms
+            </h2>
+            <div id="room-list-container" class="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                {% for room in rooms %}
+                <div class="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all group">
+                    <span class="font-semibold text-slate-200 group-hover:text-white transition-colors">{{ room.name }}</span>
+                    <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
+                        data-room-slug="{{ room.slug }}"
+                        data-room-url="{% url 'room' room_slug=room.slug %}"
+                        data-room-owner="{{ room.owner_username }}">
+                        Enter Room
+                    </button>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+                    <p class="text-slate-500">No rooms available. Be the first to create one!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
-        <h2>Create New Room</h2>
-        <form class="create-form" id="room-create-form">
-            <label for="room-name-input">Room Name</label>
-            <input id="room-name-input" type="text" placeholder="e.g., Project Alpha or Daily Standup" required>
+        <!-- Create Room Section -->
+        <div class="p-8 pt-6 bg-slate-800/20 border-t border-slate-800">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                <span class="w-2 h-6 bg-emerald-500 rounded-full"></span>
+                Create New Room
+            </h2>
+            <form id="room-create-form" class="space-y-5">
+                <div>
+                    <label for="room-name-input" class="block text-sm font-medium text-slate-400 mb-2 ml-1">Room Name</label>
+                    <input id="room-name-input" type="text" 
+                        class="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                        placeholder="e.g., Project Alpha or Daily Standup" required>
+                </div>
 
-            <label for="room-secret-input">Secret Room Number (Required for Owner Access)</label>
-            <input id="room-secret-input" type="text" placeholder="e.g., 12345" required>
+                <div>
+                    <label for="room-secret-input" class="block text-sm font-medium text-slate-400 mb-2 ml-1">Secret Room Number</label>
+                    <input id="room-secret-input" type="text" 
+                        class="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                        placeholder="e.g., 12345" required>
+                    <p class="mt-2 text-xs text-slate-500 ml-1">Required for owner access and administrative tasks.</p>
+                </div>
 
-            <!-- <input type="hidden" id="current-username" value="{{ username }}">  -->
-            <input type="hidden" id="current-username" value="">
-            <button id="room-create-submit" type="submit">Create Room</button>
-        </form>
+                <button id="room-create-submit" type="submit" 
+                    class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-emerald-900/20">
+                    Create Room
+                </button>
+            </form>
 
-        <button id="leave-lobby-btn" class="leave-lobby-button">
-            Leave Lobby
-        </button>
-
+            <button id="leave-lobby-btn" 
+                class="w-full mt-6 py-3 bg-slate-800 hover:bg-rose-900/40 hover:text-rose-400 text-slate-400 font-semibold rounded-xl border border-slate-700 transition-all">
+                Leave Lobby
+            </button>
+        </div>
     </div>
+</div>
+{% endblock %}
 
-    <!-- {{ username|json_script:"user-name" }}  -->
+{% block extra_js %}
+<script>
+    const EXIT_PATH = '/chat/';
 
-    <script>
-        const EXIT_PATH = '/chat/';
+    function navigateToIndex() {
+        sessionStorage.removeItem('chatUsername');
+        window.location.replace(EXIT_PATH);
+        throw new Error("Lobby session terminated.");
+    }
 
-        // Function to handle redirection to the index page (uses replace to destroy history)
-        // Defined globally so it can be called immediately by the refresh check
-        function navigateToIndex() {
-            // Clear the username data before exiting
-            sessionStorage.removeItem('chatUsername');
+    const urlParams = new URLSearchParams(window.location.search);
+    const usernameFromUrl = urlParams.get('username');
+    const storedUsername = sessionStorage.getItem('chatUsername');
 
-            // window.location.replace is used here to ensure the browser does not save the lobby page
-            window.location.replace(EXIT_PATH);
-            // Stop further script execution
-            throw new Error("Lobby session terminated.");
+    if (usernameFromUrl) {
+        sessionStorage.setItem('chatUsername', usernameFromUrl);
+        history.replaceState(null, document.title, location.pathname);
+    } else if (!storedUsername) {
+        navigateToIndex();
+    }
+
+    const CURRENT_USERNAME = sessionStorage.getItem('chatUsername');
+    document.getElementById('display-username').textContent = CURRENT_USERNAME;
+
+    try {
+        const currentUrl = new URL(window.location);
+        const joinFailedReason = currentUrl.searchParams.get('join_failed');
+        if (joinFailedReason) {
+            currentUrl.searchParams.delete('join_failed');
+            history.replaceState({}, document.title, currentUrl.toString());
         }
+        history.replaceState(null, document.title, location.pathname);
+        history.pushState(null, null, location.href);
+    } catch (e) {
+        console.warn("Could not manage history state:", e);
+    }
 
-        // --- LOBBY SESSION & URL CLEANUP LOGIC ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const usernameFromUrl = urlParams.get('username');
-        const storedUsername = sessionStorage.getItem('chatUsername');
+    window.onpopstate = function () {
+        history.go(1);
+        Swal.fire({
+            title: 'Cannot Go Back',
+            text: "To leave the chat lobby and log out, please use the 'Leave Lobby' button.",
+            icon: 'info',
+            background: '#0f172a',
+            color: '#f1f5f9',
+            confirmButtonColor: '#4f46e5',
+            confirmButtonText: 'Got It'
+        });
+    };
 
-        if (usernameFromUrl) {
-            // 1. Initial Access (e.g., from index.html or room redirect)
-            sessionStorage.setItem('chatUsername', usernameFromUrl);
-            // CRITICAL: Clean the URL immediately to prevent username persistence on refresh
-            // This makes subsequent refreshes land on /chat/lobby/ (without ?username=)
-            history.replaceState(null, document.title, location.pathname);
+    let previousRoomSlugs = new Set();
 
-        } else if (!storedUsername) {
-            // 2. Refresh/Unauthorized Access: No username in URL AND no username in session
-            console.log("No stored session. Redirecting to login.");
-            navigateToIndex(); // This is the function that uses location.replace('/chat/')
-        }
-        // If storedUsername exists and no username in URL (i.e., normal session), proceed.
-        // --- END LOBBY SESSION & URL CLEANUP LOGIC ---
-
-
-        // --- CRITICAL GUARDRAIL CHECK (Runs if not a reload) ---
-        const usernameFromSession = sessionStorage.getItem('chatUsername');
-        if (!usernameFromSession) {
-            // If session is missing for any reason (e.g., manual session storage clear), redirect.
-            window.location.replace(EXIT_PATH);
-            throw new Error("Unauthorized access: Session data missing. Redirecting.");
-        }
-        // --- END GUARDRAIL CHECK ---
-
-        // Now, we retrieve the username from sessionStorage for use in the script
-        const CURRENT_USERNAME = sessionStorage.getItem('chatUsername');
-        // document.getElementById('current-username').value = CURRENT_USERNAME; // Set the hidden field
-
-        // You must also update the display to show the stored username instead of {{ username }}
-        // document.querySelector('p strong').textContent = CURRENT_USERNAME;
-
-        // --- BROWSER HISTORY TRAP MECHANISM AND URL CLEANING ---
+    async function updateRoomList() {
         try {
-            const currentUrl = new URL(window.location);
-            const joinFailedReason = currentUrl.searchParams.get('join_failed');
+            const response = await fetch('/chat/api/rooms/');
+            const data = await response.json();
+            const rooms = data.rooms;
+            const currentRoomSlugs = new Set(rooms.map(r => r.slug));
 
-            // 1. Handle redirect-based error message cleanup
-            if (joinFailedReason) {
-                currentUrl.searchParams.delete('join_failed');
-                history.replaceState({}, document.title, currentUrl.toString());
-            }
-
-            // REINFORCEMENT: Overwrite the previous history entry with the current lobby URL,
-            // preventing the 'Back' button from going to the chat room.
-            history.replaceState(null, document.title, location.pathname);
-
-            // Add the duplicate history entry to set up the continuous trap
-            history.pushState(null, null, location.href);
-
-        } catch (e) {
-            console.warn("Could not manage history state or check query params on load:", e);
-        }
-
-        // Trap for back button clicked while IN the lobby (prevents exiting)
-        window.onpopstate = function () {
-            // Push forward to stay on the lobby page
-            history.go(1);
-            console.log("Back button click detected. Trapping user and showing alert.");
-
-            Swal.fire({
-                title: 'Cannot Go Back',
-                text: "To leave the chat lobby and log out, please use the red 'Leave Lobby' button.",
-                icon: 'info',
-                customClass: {
-                    container: 'mobile-alert-responsive-container'
-                },
-                confirmButtonText: 'Got It',
-                confirmButtonColor: '#DC2626'
-            });
-        };
-        // --- END BROWSER HISTORY TRAP ---
-
-        // --- REAL-TIME ROOM LIST UPDATE (POLLING) - Define functions globally ---
-        let previousRoomSlugs = new Set();
-
-        // Function to fetch and update the room list
-        async function updateRoomList() {
-            try {
-                console.log('[Polling] Checking for room updates...');
-                const response = await fetch('/chat/api/rooms/');
-                const data = await response.json();
-                const rooms = data.rooms;
-
-                console.log('[Polling] Fetched rooms:', rooms.length);
-
-                // Get current room slugs
-                const currentRoomSlugs = new Set(rooms.map(room => room.slug));
-
-                // Check if there are any changes
-                const hasChanges = rooms.length !== previousRoomSlugs.size ||
-                    !Array.from(currentRoomSlugs).every(slug => previousRoomSlugs.has(slug));
-
-                console.log('[Polling] Has changes:', hasChanges, 'Previous:', previousRoomSlugs.size, 'Current:', rooms.length);
-
-                // Update UI if there are changes (including going from 0 to 1+ rooms)
-                if (hasChanges) {
-                    console.log('🔄 Room list updated, refreshing UI...');
-                    refreshRoomListUI(rooms);
+            if (currentRoomSlugs.size !== previousRoomSlugs.size || ![...currentRoomSlugs].every(s => previousRoomSlugs.has(s))) {
+                const container = document.getElementById('room-list-container');
+                if (rooms.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+                            <p class="text-slate-500">No rooms available. Be the first to create one!</p>
+                        </div>`;
+                } else {
+                    container.innerHTML = rooms.map(room => `
+                        <div class="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all group animate-fadeIn">
+                            <span class="font-semibold text-slate-200 group-hover:text-white transition-colors">${room.name}</span>
+                            <button class="join-request-button px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-indigo-900/20"
+                                data-room-slug="${room.slug}"
+                                data-room-url="/chat/room/${room.slug}/"
+                                data-room-owner="${room.owner_username}">
+                                Enter Room
+                            </button>
+                        </div>
+                    `).join('');
                 }
-
-                // Update the previous state
                 previousRoomSlugs = currentRoomSlugs;
-
-            } catch (error) {
-                console.error('Failed to fetch room list:', error);
             }
+        } catch (error) {
+            console.error('[Polling] Error:', error);
         }
+    }
 
-        // Function to refresh the room list UI
-        function refreshRoomListUI(rooms) {
-            const roomListContainer = document.getElementById('room-list-container');
+    setInterval(updateRoomList, 3000);
 
-            if (rooms.length === 0) {
-                roomListContainer.innerHTML = '<p style="text-align: center; color: #9CA3AF;">No rooms available. Be the first to create one!</p>';
+    document.getElementById('room-create-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const roomName = document.getElementById('room-name-input').value;
+        const secretNum = document.getElementById('room-secret-input').value;
+        const submitBtn = document.getElementById('room-create-submit');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+
+        try {
+            const response = await fetch('/chat/api/rooms/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    room_name: roomName,
+                    secret_number: secretNum,
+                    username: CURRENT_USERNAME
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                window.location.href = `/chat/room/${data.slug}/?username=${encodeURIComponent(CURRENT_USERNAME)}`;
             } else {
-                roomListContainer.innerHTML = '';
-                rooms.forEach(room => {
-                    const roomItem = document.createElement('div');
-                    roomItem.className = 'room-item';
-
-                    const roomName = document.createElement('span');
-                    roomName.textContent = room.name;
-
-                    const joinButton = document.createElement('button');
-                    joinButton.className = 'join-request-button';
-                    joinButton.textContent = 'Enter Room';
-                    joinButton.dataset.roomSlug = room.slug;
-                    joinButton.dataset.roomUrl = `/chat/room/${room.slug}/`;
-                    joinButton.dataset.roomOwner = room.owner_username;
-
-                    roomItem.appendChild(roomName);
-                    roomItem.appendChild(joinButton);
-                    roomListContainer.appendChild(roomItem);
-                });
+                throw new Error(data.error || 'Failed to create room');
             }
+        } catch (error) {
+            Swal.fire({
+                title: 'Error',
+                text: error.message,
+                icon: 'error',
+                background: '#0f172a',
+                color: '#f1f5f9',
+                confirmButtonColor: '#4f46e5'
+            });
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create Room';
         }
-        // --- END POLLING FUNCTION DEFINITIONS ---
+    };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Ensure this logic only runs if CURRENT_USERNAME was successfully retrieved
-            if (CURRENT_USERNAME) {
-                // Set the visible username in the paragraph tag
-                document.getElementById('display-username').textContent = CURRENT_USERNAME;
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('join-request-button')) {
+            const url = e.target.dataset.roomUrl;
+            window.location.href = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}`;
+        }
+    });
 
-                // Set the hidden input field for use in form submission logic later
-                document.getElementById('current-username').value = CURRENT_USERNAME;
-            }
+    document.getElementById('leave-lobby-btn').onclick = () => navigateToIndex();
+</script>
 
-            const roomNameInput = document.getElementById('room-name-input');
-            const roomSecretInput = document.getElementById('room-secret-input');
-            const form = document.getElementById('room-create-form');
-            const roomListContainer = document.getElementById('room-list-container');
-            const leaveLobbyBtn = document.getElementById('leave-lobby-btn');
-
-            // Function to handle navigation to rooms (uses assign to allow normal forward navigation)
-            function navigateToRoom(targetUrl) {
-                // Use assign to allow the back button to return to the lobby from the room.
-                window.location.assign(targetUrl);
-            }
-
-            // 1. Handle "Create Room" Form Submission
-            form.onsubmit = function (e) {
-                e.preventDefault();
-                const roomName = roomNameInput.value.trim();
-                const roomSecret = roomSecretInput.value.trim();
-
-                if (roomName === '' || roomSecret === '') {
-                    Swal.fire({
-                        title: 'Missing Information',
-                        text: 'Please enter both a Room Name and the Secret Room Number.',
-                        icon: 'error',
-                        customClass: {
-                            container: 'mobile-alert-responsive-container'
-                        },
-                        confirmButtonColor: '#DC2626'
-                    });
-                    return;
-                }
-
-                const roomSlug = roomName
-                    .toLowerCase()
-                    .replace(/[^\w\s-]/g, '')
-                    .trim()
-                    .replace(/[\s-]+/g, '-');
-
-                // Passing the secret number in the URL (THIS MUST BE VALIDATED ON THE BACKEND)
-                const targetUrl = `/chat/room/${roomSlug}/?username=${encodeURIComponent(CURRENT_USERNAME)}&owner_username=${encodeURIComponent(CURRENT_USERNAME)}&new=true&name=${encodeURIComponent(roomName)}&secret=${encodeURIComponent(roomSecret)}`;
-
-                console.log("Creating room and navigating current tab to:", targetUrl);
-                navigateToRoom(targetUrl);
-                roomNameInput.value = '';
-                roomSecretInput.value = '';
-            };
-
-            // 2. Handle "Join" Button Clicks
-            roomListContainer.addEventListener('click', async (e) => {
-                const button = e.target.closest('.join-request-button');
-                if (button) {
-                    const roomUrl = button.dataset.roomUrl;
-                    const roomOwner = button.dataset.roomOwner;
-
-                    let targetUrl = `${roomUrl}?username=${encodeURIComponent(CURRENT_USERNAME)}`;
-
-                    // --- OWNER vs NON-OWNER LOGIC ---
-                    if (CURRENT_USERNAME === roomOwner) {
-                        // Owner: Navigate to room directly (security check will happen in room.js)
-                        console.log(`Owner entering room directly. Security check will occur in room.js`);
-                        // No secret prompt in lobby - room.js will handle it
-                    } else {
-                        // Non-owner user: normal request process
-                        targetUrl += `&request=true`;
-                    }
-                    // --- END LOGIC ---
-
-                    console.log(`Navigating to room: ${targetUrl}`);
-                    navigateToRoom(targetUrl);
-                }
-            });
-
-            // 3. Handle "Leave Lobby" Button Click
-            leaveLobbyBtn.onclick = function () {
-                console.log(`Leaving lobby via button. Clearing data and redirecting to ${EXIT_PATH}...`);
-                // This calls navigateToIndex, which handles clearing sessionStorage and using location.replace()
-                navigateToIndex();
-            };
-
-            // 4. Initialize room list polling
-            console.log('🚀 Initializing room list polling...');
-
-            // Get initial room slugs from server-rendered HTML
-            const initialRoomElements = document.querySelectorAll('.join-request-button');
-            initialRoomElements.forEach(btn => {
-                previousRoomSlugs.add(btn.dataset.roomSlug);
-            });
-
-            console.log('[Polling] Initial room count:', previousRoomSlugs.size);
-
-            // Immediately fetch the latest room list to ensure sync
-            updateRoomList();
-
-            // Start polling every 2 seconds for continuous updates
-            setInterval(updateRoomList, 2000);
-            console.log('[Polling] Started polling with 2s interval');
-        });
-
-
-        window.addEventListener('pageshow', (event) => {
-            // 'event.persisted' is true if the page was retrieved from the browser's BFcache (Back button click).
-            if (event.persisted) {
-                console.log("Pageshow detected a BFcache restore (Back button click). Forcing clean reload.");
-
-                // CRITICAL: We use location.replace() to navigate away from the cached page 
-                // without saving the current state into the history stack. 
-                // This ensures the page is always fetched fresh from the server on 'Back'.
-
-                // Get the current clean URL (location.pathname) and add the username parameter
-                const currentUsername = sessionStorage.getItem('chatUsername');
-                const cleanLobbyUrl = `/chat/lobby/?username=${encodeURIComponent(currentUsername)}`;
-
-                // Temporarily disable the popstate trap to avoid a race condition before replace()
-                window.onpopstate = null;
-
-                window.location.replace(cleanLobbyUrl);
-                // Throw to stop any other pending script execution
-                throw new Error("Forcing clean lobby load to prevent stale room list.");
-            }
-        });
-
-
-    </script>
-</body>
-
-</html>
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+</style>
+{% endblock %}
