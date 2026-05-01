@@ -600,6 +600,45 @@ function confirmAndLeave() {
     });
 }
 
+window.cancelJoinAndLeave = function() {
+    console.log("cancelJoinAndLeave called");
+    Swal.fire({
+        title: 'Return to Lobby?',
+        text: 'Are you sure you want to cancel your join request and return to the lobby?',
+        icon: 'question',
+        customClass: { container: 'mobile-alert-responsive-container' },
+        showCancelButton: true,
+        confirmButtonColor: '#DC2626',
+        cancelButtonColor: '#4B5563',
+        confirmButtonText: 'Yes, Return',
+        cancelButtonText: 'Wait Here',
+        didOpen: () => {
+            const container = Swal.getContainer();
+            if (container) {
+                container.style.zIndex = '20000';
+            }
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            if (typeof isUserLeaving !== 'undefined') {
+                isUserLeaving = true;
+            }
+            if (typeof disableExitPrevention === 'function') {
+                disableExitPrevention();
+            }
+            
+            // Send explicit leave signal to the server so the request is removed
+            if (typeof chatSocket !== 'undefined' && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.send(JSON.stringify({ 'type': 'explicit_leave', 'sender': fixedUsername }));
+            }
+
+            setTimeout(() => {
+                window.location.replace(`/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`);
+            }, 100);
+        }
+    });
+}
+
 // --- NEW: MENTION LOGIC ---
 
 function hideMentionSuggestions() {

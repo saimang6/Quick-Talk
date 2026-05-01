@@ -1486,10 +1486,13 @@ function handleSocketMessage(e) {
             if (isOwner && requestCountSpan) {
                 requestCountSpan.textContent = data.count;
                 updateBellIconColor(data.count);
-                if (data.count > 0 && Array.isArray(data.requesters)) {
+                
+                // Always clear and rebuild to ensure accuracy
+                if (pendingRequestsContainer && Array.isArray(data.requesters)) {
                     pendingRequestsContainer.innerHTML = '';
                     data.requesters.forEach(requester => displayRequestCard(requester, false));
                 }
+                
                 updateRequestPanelContent();
             }
             break;

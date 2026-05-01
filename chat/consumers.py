@@ -251,20 +251,25 @@ class ChatConsumer(WebsocketConsumer):
             # We enforce immediate removal for owner channels to prevent routing valid requests to dead channels
             del self.ROOM_OWNER_CHANNELS[self.room_slug]
             
+        # Check if this user explicitly requested to leave (via 'explicit_leave' message)
+        has_explicitly_left = getattr(self, 'has_explicitly_left', False)
+
         # 3. Remove from requesters list if they disconnect while waiting
         is_pending_disconnect = False
         if self.room_slug in self.ROOM_REQUESTERS and self.username in self.ROOM_REQUESTERS[self.room_slug]:
              if self.ROOM_REQUESTERS[self.room_slug][self.username] == self.channel_name:
                  del self.ROOM_REQUESTERS[self.room_slug][self.username]
                  is_pending_disconnect = True
+                 
+                 # NEW: If they explicitly left, remove from persistent list too
+                 if has_explicitly_left:
+                     self._remove_persistent_requester(self.username)
+                     print(f"Removed persistent requester {self.username} due to explicit leave.")
+
                  # IMPORTANT: Broadcast request count update to owner
                  self.broadcast_request_count_to_owner() 
 
         # 4. ACTIVE USER HANDLING (Modified for Persistence)
-        # Check if this user explicitly requested to leave (via 'explicit_leave' message)
-        # We use a set stored on the class or check a property. 
-        # Since 'disconnect' is called on the instance, we can check an instance flag set by the 'explicit_leave' handler.
-        has_explicitly_left = getattr(self, 'has_explicitly_left', False)
 
         user_left = False
         if self.room_slug in self.ROOM_USERS and self.username in self.ROOM_USERS[self.room_slug]:
