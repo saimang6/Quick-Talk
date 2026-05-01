@@ -89,13 +89,17 @@ window.availableParticipants = [];
 var mentionSuggestionsDom = document.querySelector('#mention-suggestions');
 
 // Initial state checks
-if (document.getElementById('is-requester')) {
-    isPendingUser = JSON.parse(document.getElementById('is-requester').textContent);
+// Check for stored access in this session/tab
+const accessKey = `access_granted_${roomSlug}`;
+const hasStoredAccess = sessionStorage.getItem(accessKey) === 'true';
+
+// By default, non-owners are pending unless they have verified access in this session
+if (isOwner || hasStoredAccess) {
+    isAccessGranted = true;
+    isPendingUser = false;
 } else {
-    const urlParams = new URLSearchParams(window.location.search);
-    // Check if URL has request arg OR just force pending for all non-owners (as per latest requirement)
-    // We force pending because backend forces pending on connect.
-    isPendingUser = !isOwner;
+    isAccessGranted = false;
+    isPendingUser = true;
 }
 
 // Initial UI setup

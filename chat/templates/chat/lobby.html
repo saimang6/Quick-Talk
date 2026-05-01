@@ -15,6 +15,7 @@
                 Logged in as: <span id="display-username" class="font-bold text-indigo-400">Loading...</span>
             </p>
             <input type="hidden" id="current-username" value="">
+            {{ session_owned_rooms|json_script:"session-owned-rooms" }}
         </div>
 
         <!-- Room List Section -->
@@ -34,12 +35,19 @@
                             data-room-owner="{{ room.owner_username }}">
                             Enter Room
                         </button>
-                        {% if room.owner_username == username %}
+                        {% if room.owner_username == username and room.slug in session_owned_rooms %}
                         <button class="delete-room-button flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 text-sm font-bold rounded-lg border border-rose-500/20 transition-all group/del"
                             data-room-slug="{{ room.slug }}"
                             data-room-name="{{ room.name }}">
                             <i class="fas fa-trash-alt group-hover/del:scale-110 transition-transform"></i>
                             <span>Delete</span>
+                        </button>
+                        {% elif room.owner_username == username %}
+                        <button class="manage-room-button flex items-center gap-2 px-3 py-2 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 text-sm font-bold rounded-lg border border-amber-500/20 transition-all group/manage"
+                            data-room-slug="{{ room.slug }}"
+                            data-room-name="{{ room.name }}">
+                            <i class="fas fa-shield-alt group-hover/manage:scale-110 transition-transform"></i>
+                            <span>Manage</span>
                         </button>
                         {% endif %}
                     </div>
@@ -113,6 +121,9 @@
     const CURRENT_USERNAME = sessionStorage.getItem('chatUsername');
     document.getElementById('display-username').textContent = CURRENT_USERNAME;
 
+    // Rooms owned in the current server session
+    const SESSION_OWNED_ROOMS = new Set(JSON.parse(document.getElementById('session-owned-rooms').textContent));
+
     try {
         const currentUrl = new URL(window.location);
         const joinFailedReason = currentUrl.searchParams.get('join_failed');
@@ -140,8 +151,13 @@
     };
 
     let previousRoomSlugs = new Set();
+    const OWNED_ROOMS_KEY = `owned_rooms_${CURRENT_USERNAME}`;
 
-    setInterval(() => updateRoomList(CURRENT_USERNAME), 3000);
+    // Start polling for room updates
+    const roomPollingInterval = setInterval(() => updateRoomList(CURRENT_USERNAME), 3000);
+    
+    // Initial update
+    updateRoomList(CURRENT_USERNAME);
 
     async function updateRoomList(username) {
         try {
@@ -160,7 +176,9 @@
                         </div>`;
                 } else {
                     container.innerHTML = rooms.map(room => {
-                        const isOwner = (room.owner_username === CURRENT_USERNAME);
+                        const isConfirmedOwner = (room.owner_username === CURRENT_USERNAME) && SESSION_OWNED_ROOMS.has(room.slug);
+                        const isPotentialOwner = (room.owner_username === CURRENT_USERNAME) && !isConfirmedOwner;
+
                         return `
                         <div class="flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all group animate-fadeIn">
                             <span class="font-semibold text-slate-200 group-hover:text-white transition-colors">${room.name}</span>
@@ -171,12 +189,19 @@
                                     data-room-owner="${room.owner_username}">
                                     Enter Room
                                 </button>
-                                ${isOwner ? `
+                                ${isConfirmedOwner ? `
                                 <button class="delete-room-button flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 text-sm font-bold rounded-lg border border-rose-500/20 transition-all group/del"
                                     data-room-slug="${room.slug}"
                                     data-room-name="${room.name}">
                                     <i class="fas fa-trash-alt group-hover/del:scale-110 transition-transform"></i>
                                     <span>Delete</span>
+                                </button>` : ''}
+                                ${isPotentialOwner ? `
+                                <button class="manage-room-button flex items-center gap-2 px-3 py-2 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 text-sm font-bold rounded-lg border border-amber-500/20 transition-all group/manage"
+                                    data-room-slug="${room.slug}"
+                                    data-room-name="${room.name}">
+                                    <i class="fas fa-shield-alt group-hover/manage:scale-110 transition-transform"></i>
+                                    <span>Manage</span>
                                 </button>` : ''}
                             </div>
                         </div>`;
@@ -189,7 +214,6 @@
         }
     }
 
-    setInterval(updateRoomList, 3000);
 
     document.getElementById('room-create-form').onsubmit = async (e) => {
         e.preventDefault();
@@ -216,7 +240,12 @@
 
             const data = await response.json();
             if (response.ok) {
-                window.location.href = `/chat/room/${data.slug}/?username=${encodeURIComponent(CURRENT_USERNAME)}`;
+                // Save room ownership locally
+                const ownedRooms = JSON.parse(localStorage.getItem(OWNED_ROOMS_KEY) || '{}');
+                ownedRooms[data.slug] = secretNum;
+                localStorage.setItem(OWNED_ROOMS_KEY, JSON.stringify(ownedRooms));
+                
+                window.location.href = `/chat/room/${data.slug}/?username=${encodeURIComponent(CURRENT_USERNAME)}&owner_access=true&secret=${encodeURIComponent(secretNum)}`;
             } else {
                 throw new Error(data.error || 'Failed to create room');
             }
@@ -237,17 +266,102 @@
     document.addEventListener('click', async (e) => {
         if (e.target.classList.contains('join-request-button')) {
             const url = e.target.dataset.roomUrl;
+            const slug = e.target.dataset.roomSlug;
             const roomOwner = e.target.dataset.roomOwner;
-            const isOwner = roomOwner === CURRENT_USERNAME;
-            const requestParam = isOwner ? "" : "&request=true";
-            window.location.href = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}${requestParam}`;
+            
+            // Check if we have verified ownership in this session
+            const isSessionOwner = SESSION_OWNED_ROOMS.has(slug);
+            
+            // Try to get secret from localStorage as a fallback/convenience
+            const ownedRooms = JSON.parse(localStorage.getItem(OWNED_ROOMS_KEY) || '{}');
+            const secret = ownedRooms[slug];
+            
+            let finalUrl = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}`;
+            
+            if (roomOwner === CURRENT_USERNAME) {
+                if (isSessionOwner && secret) {
+                    // Only grant owner access if the session is already verified
+                    finalUrl += `&owner_access=true&secret=${encodeURIComponent(secret)}`;
+                } else {
+                    // Name matches but session isn't verified. 
+                    // Force them to go through the approval process (or use 'Manage' first).
+                    finalUrl += `&request=true`;
+                }
+            } else {
+                finalUrl += `&request=true`;
+            }
+            
+            window.location.href = finalUrl;
         }
 
-        // --- ROOM DELETION LOGIC ---
+        // --- ROOM MANAGEMENT / DELETION LOGIC ---
         const deleteBtn = e.target.closest('.delete-room-button');
-        if (deleteBtn) {
-            const slug = deleteBtn.dataset.roomSlug;
-            const name = deleteBtn.dataset.roomName;
+        const manageBtn = e.target.closest('.manage-room-button');
+        
+        if (deleteBtn || manageBtn) {
+            const btn = deleteBtn || manageBtn;
+            const slug = btn.dataset.roomSlug;
+            const name = btn.dataset.roomName;
+            const isManage = !!manageBtn;
+
+            // Try to get secret from localStorage
+            const ownedRooms = JSON.parse(localStorage.getItem(OWNED_ROOMS_KEY) || '{}');
+            let secret = ownedRooms[slug];
+
+            if (isManage && !secret) {
+                const { value: enteredSecret } = await Swal.fire({
+                    title: 'Verify Ownership',
+                    text: `Enter the secret number for "${name}" to gain administrative access.`,
+                    input: 'text',
+                    inputPlaceholder: 'Secret Number',
+                    showCancelButton: true,
+                    background: '#0f172a',
+                    color: '#f1f5f9',
+                    confirmButtonColor: '#4f46e5'
+                });
+
+                if (!enteredSecret) return;
+                
+                // Verify with backend
+                try {
+                    const verifyResponse = await fetch(`/chat/api/rooms/${slug}/verify/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            username: CURRENT_USERNAME,
+                            secret_number: enteredSecret
+                        })
+                    });
+
+                    if (!verifyResponse.ok) {
+                        const verifyData = await verifyResponse.json();
+                        throw new Error(verifyData.error || 'Verification failed');
+                    }
+
+                    // Save to localStorage so they don't have to enter it again this session
+                    ownedRooms[slug] = enteredSecret;
+                    localStorage.setItem(OWNED_ROOMS_KEY, JSON.stringify(ownedRooms));
+                    SESSION_OWNED_ROOMS.add(slug);
+                    secret = enteredSecret;
+                    
+                    // Immediately refresh the list to show the Delete button
+                    updateRoomList(CURRENT_USERNAME);
+                    
+                    Swal.fire({
+                        title: 'Access Granted',
+                        text: 'You now have administrative access to this room.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+                return;
+            }
 
             const result = await Swal.fire({
                 title: 'Delete Room?',
@@ -267,11 +381,18 @@
                             'Content-Type': 'application/json',
                             'X-CSRFToken': '{{ csrf_token }}'
                         },
-                        body: JSON.stringify({ username: CURRENT_USERNAME })
+                        body: JSON.stringify({ 
+                            username: CURRENT_USERNAME,
+                            secret_number: secret
+                        })
                     });
 
                     const data = await response.json();
                     if (response.ok) {
+                        // Success! Clean up local storage
+                        delete ownedRooms[slug];
+                        localStorage.setItem(OWNED_ROOMS_KEY, JSON.stringify(ownedRooms));
+                        
                         Swal.fire({
                             title: 'Deleted!',
                             text: 'Room has been deleted successfully.',
@@ -279,11 +400,15 @@
                             timer: 1500,
                             showConfirmButton: false
                         });
-                        // Force a full page reload to ensure the UI is perfectly synced with the DB
+                        
                         setTimeout(() => {
                             window.location.replace(`/chat/lobby/?username=${encodeURIComponent(CURRENT_USERNAME)}`);
                         }, 500);
                     } else {
+                        // If the secret was wrong, remove it from localStorage so they have to re-enter
+                        delete ownedRooms[slug];
+                        localStorage.setItem(OWNED_ROOMS_KEY, JSON.stringify(ownedRooms));
+                        updateRoomList(CURRENT_USERNAME);
                         throw new Error(data.error || 'Failed to delete room');
                     }
                 } catch (error) {

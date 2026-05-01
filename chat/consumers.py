@@ -63,12 +63,19 @@ class ChatConsumer(WebsocketConsumer):
             self.close(code=4004)
             return
         
-        self.is_owner = self.room_instance.owner_username == self.username
+        # Verify ownership via session OR provided secret
+        session_secret = self.scope.get('session', {}).get(f'room_secret_{self.room_slug}')
+        
+        self.is_owner = (self.room_instance.owner_username == self.username) and (
+            self.room_instance.secret_number == submitted_secret or 
+            self.room_instance.secret_number == session_secret
+        )
 
         # === START FIX: Ensure proper close code transmission ===
-        if self.is_owner and is_owner_access_attempt:
-            # Check 1: If the user is the owner, but failed the secret check
-            if submitted_secret != self.room_instance.secret_number:
+        if (self.room_instance.owner_username == self.username) and is_owner_access_attempt:
+            # Check 1: If the user has the owner's name and is trying to access as owner, 
+            # but failed the secret check (both submitted and session)
+            if not self.is_owner:
                 
                 # CRITICAL FIX: Accept connection first to transmit custom close code
                 self.accept() 
@@ -208,11 +215,11 @@ class ChatConsumer(WebsocketConsumer):
             # 5. Broadcast the updated user list
             self.broadcast_user_list(send_join_message=False)
             
-            # 6. CRITICAL FIX: Handle user who was approved/denied while offline
-            if not self.is_owner and is_request_join and not is_still_pending_in_db:
-                # User was approved/denied while disconnected. Since they are here, assume approval for unblock.
-                self.send(text_data=json.dumps({'type': 'access_granted'})) 
-                # self.send_system_message(f"{self.username} has joined the room.")
+            # --- REMOVED OVER-EAGER ACCESS GRANTED ---
+            # We no longer assume that "not in pending list" means "approved".
+            # This prevents denied users from re-entering automatically.
+            # If they were approved while offline, they'll be in ROOM_USERS on reconnect
+            # or they can just wait for a new approval.
         
         # 7. Always Sync the request count for the owner on connect
         if self.is_owner:

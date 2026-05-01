@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/rooms/', views.get_rooms_json, name='get_rooms_json'),
     path('api/rooms/create/', views.create_room_json, name='create_room_json'),
     path('api/rooms/<str:room_slug>/delete/', views.delete_room_json, name='delete_room_json'),
+    path('api/rooms/<str:room_slug>/verify/', views.verify_room_secret, name='verify_room_secret'),
     
     # 3. Dynamic Chat Room URL (uses room slug)
     path('room/<str:room_slug>/', views.room, name='room'),

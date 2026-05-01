@@ -77,19 +77,16 @@ let pickerOpen = false;
 const accessKey = `access_granted_${roomSlug}`;
 const hasStoredAccess = sessionStorage.getItem(accessKey) === 'true';
 
-if (document.getElementById('is-requester')) {
-    // If template says pending, but storage says accessible, trust storage (reload case)
-    let templatePending = JSON.parse(document.getElementById('is-requester').textContent);
-    isPendingUser = hasStoredAccess ? false : templatePending;
-} else {
-    const urlParams = new URLSearchParams(window.location.search);
-    let urlPending = urlParams.get('request') === 'true';
-    isPendingUser = (!isOwner && urlPending && !hasStoredAccess);
-}
+// By default, non-owners are pending unless they have stored access in this tab
+isPendingUser = !isOwner && !hasStoredAccess;
 
 // Ensure access granted state matches
-if (!isOwner && !isPendingUser) {
+if (isOwner || hasStoredAccess) {
     isAccessGranted = true;
+    isPendingUser = false;
+} else {
+    isAccessGranted = false;
+    isPendingUser = true;
 }
 
 // Initial UI setup
@@ -642,6 +639,19 @@ function sendDeleteRoom() {
     }
 }
 
+// ===================================================================
+// UTILITY FUNCTIONS (Navigation, etc.)
+// ===================================================================
+
+/**
+ * Redirects the user back to the lobby.
+ */
+function redirectToLobby() {
+    isUserLeaving = true;
+    disableExitPrevention();
+    window.location.replace(`/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`);
+}
+
 
 // ===================================================================
 // MESSAGE RECEIVING HANDLER
@@ -1107,8 +1117,8 @@ function confirmAndLeave() {
             cancelButtonText: 'Stay in Room'
         }).then((result) => {
             if (result.isConfirmed) {
-                // ACTION: Send DELETE command via WebSocket immediately, then redirect.
-                sendDeleteRoom();
+                // ACTION: Redirect to lobby and delete from there if needed.
+                // Since owners are encouraged to delete from the lobby, we just redirect.
                 redirectToLobby();
             } else if (result.isDenied) {
                 // ACTION: Standard exit without deletion signal

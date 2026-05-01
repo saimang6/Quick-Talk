@@ -172,7 +172,7 @@
     {% endif %}
 
     <!-- Waiting for Approval Overlay -->
-    <div id="approval-overlay" class="request-approval-overlay hidden animate-fadeIn">
+    <div id="approval-overlay" class="request-approval-overlay {% if is_owner %}hidden{% endif %} animate-fadeIn">
         <div class="text-center space-y-6 max-w-md">
             <div class="relative inline-block">
                 <div class="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center border-2 border-amber-500/20">

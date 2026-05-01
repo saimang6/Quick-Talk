@@ -1082,8 +1082,8 @@ function connectWebSocket() {
         return;
     }
 
-    // Check if the URL currently has the "request" parameter
-    if (isOwner) {
+    // Initial UI state based on ownership or previously granted access
+    if (isOwner || isAccessGranted) {
         if (mainChatContainer) {
             mainChatContainer.style.display = 'flex';
             mainChatContainer.classList.remove('hidden-chat-interface');
@@ -1371,20 +1371,24 @@ function handleSocketMessage(e) {
     switch (data.type) {
 
         case 'access_granted':
-            if (!isOwner && !isAccessGranted && isPendingUser) {
-                if (approvalOverlay) approvalOverlay.classList.add('hidden');
-                if (mainChatContainer) {
-                    mainChatContainer.classList.remove('hidden-chat-interface');
-                    mainChatContainer.style.display = 'flex';
-                }
-                const approvalMessageDisplay = document.getElementById('awaiting-approval-message');
-                if (approvalMessageDisplay) approvalMessageDisplay.classList.add('hidden');
+            if (!isOwner) {
+                // Persist access for reloads in this session/tab
+                sessionStorage.setItem(`access_granted_${roomSlug}`, 'true');
 
-                isPendingUser = false;
-                isAwaitingServerSync = true;
+                if (!isAccessGranted && isPendingUser) {
+                    if (approvalOverlay) approvalOverlay.classList.add('hidden');
+                    if (mainChatContainer) {
+                        mainChatContainer.classList.remove('hidden-chat-interface');
+                        mainChatContainer.style.display = 'flex';
+                    }
+                    const approvalMessageDisplay = document.getElementById('awaiting-approval-message');
+                    if (approvalMessageDisplay) approvalMessageDisplay.classList.add('hidden');
 
-                if (messageInputDom) messageInputDom.disabled = false;
-                if (submitButtonDom) submitButtonDom.disabled = false;
+                    isPendingUser = false;
+                    isAwaitingServerSync = true;
+
+                    if (messageInputDom) messageInputDom.disabled = false;
+                    if (submitButtonDom) submitButtonDom.disabled = false;
 
                 // --- CRITICAL FIX: CLEAN URL TO PREVENT "PENDING LOOP" ON RELOAD/RECONNECT ---
                 // This ensures that if the browser refreshes or reconnects (e.g. after backgrounding),
@@ -1400,7 +1404,8 @@ function handleSocketMessage(e) {
                     console.error("Failed to clean URL:", e);
                 }
             }
-            break;
+        }
+        break;
 
         case 'error':
             if (isAwaitingServerSync && data.message.includes('Access denied')) {
@@ -1415,17 +1420,22 @@ function handleSocketMessage(e) {
             break;
 
         case 'access_denied':
-            if (!isOwner && isPendingUser) {
-                isAccessGranted = false;
-                isAwaitingServerSync = false;
-                isPendingUser = false;
-                if (overlayStatusMessage) overlayStatusMessage.textContent = "Access Denied.";
-                if (denialMessageDisplay) denialMessageDisplay.style.display = 'block';
-                if (sendJoinRequestBtn) sendJoinRequestBtn.style.display = 'none';
-                setTimeout(() => {
-                    isUserLeaving = true;
-                    window.location.assign(`/chat/lobby/?username=${fixedUsername}`);
-                }, 3000);
+            if (!isOwner) {
+                // Clear any stored access
+                sessionStorage.removeItem(`access_granted_${roomSlug}`);
+
+                if (isPendingUser || isAccessGranted) {
+                    isAccessGranted = false;
+                    isAwaitingServerSync = false;
+                    isPendingUser = false;
+                    if (overlayStatusMessage) overlayStatusMessage.textContent = "Access Denied.";
+                    if (denialMessageDisplay) denialMessageDisplay.style.display = 'block';
+                    if (sendJoinRequestBtn) sendJoinRequestBtn.style.display = 'none';
+                    setTimeout(() => {
+                        isUserLeaving = true;
+                        window.location.assign(`/chat/lobby/?username=${fixedUsername}`);
+                    }, 3000);
+                }
             }
             break;
 
@@ -1599,8 +1609,15 @@ function handleSocketMessage(e) {
         case 'session_status':
             if (data.status === 'pending') {
                 console.log("Session Status: Pending (Reason: " + data.reason + ")");
+                
+                // Force UI into pending state
+                isPendingUser = true;
+                if (approvalOverlay) approvalOverlay.classList.remove('hidden');
+                if (mainChatContainer) {
+                    mainChatContainer.style.display = 'none';
+                    mainChatContainer.classList.add('hidden-chat-interface');
+                }
 
-                // If we receive this, it means we connected but are not in the active list.
                 // If we are NOT the owner and NOT explicitly just requesting access (i.e., we are returning),
                 // we treat this as a session timeout.
 

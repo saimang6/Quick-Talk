@@ -28,9 +28,17 @@ def lobby(request):
     # Manual deletion by the owner is now the primary way rooms are removed.
     active_rooms = all_rooms
 
+    # Get rooms owned by the current user in this session
+    session_owned_rooms = [
+        slug.replace('room_secret_', '') 
+        for slug in request.session.keys() 
+        if slug.startswith('room_secret_')
+    ]
+
     return render(request, 'chat/lobby.html', {
         'username': username,
         'rooms': active_rooms,
+        'session_owned_rooms': session_owned_rooms,
     })
 
 def get_rooms_json(request):
@@ -53,14 +61,25 @@ def delete_room_json(request, room_slug):
     try:
         data = json.loads(request.body)
         username = data.get('username')
+        secret_number = data.get('secret_number')
         
         room = get_object_or_404(Room, slug=room_slug)
         
+        # Verify ownership via session OR provided secret
+        session_secret = request.session.get(f'room_secret_{room_slug}')
+        
         if room.owner_username != username:
-            return JsonResponse({'error': 'Unauthorized. Only the owner can delete this room.'}, status=403)
+            return JsonResponse({'error': 'Unauthorized. Username mismatch.'}, status=403)
+            
+        if room.secret_number != secret_number and room.secret_number != session_secret:
+            return JsonResponse({'error': 'Unauthorized. Invalid secret number.'}, status=403)
             
         # Delete from DB
         room.delete()
+        
+        # Clear session
+        if f'room_secret_{room_slug}' in request.session:
+            del request.session[f'room_secret_{room_slug}']
 
         # 2. Static Cleanup (Force clear the memory state)
         # We must clear these so the lobby doesn't think the room is still "active"
@@ -92,6 +111,27 @@ def delete_room_json(request, room_slug):
 
 @require_POST
 @csrf_exempt
+def verify_room_secret(request, room_slug):
+    """API endpoint to verify a room's secret number and store it in the session."""
+    import json
+    try:
+        data = json.loads(request.body)
+        secret_number = data.get('secret_number')
+        username = data.get('username')
+        
+        room = get_object_or_404(Room, slug=room_slug)
+        
+        if room.owner_username == username and room.secret_number == secret_number:
+            # Store in session for subsequent requests
+            request.session[f'room_secret_{room_slug}'] = secret_number
+            return JsonResponse({'status': 'success'})
+        else:
+            return JsonResponse({'error': 'Invalid secret number or username mismatch'}, status=403)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@require_POST
+@csrf_exempt
 def create_room_json(request):
     """API endpoint to create a new room and return JSON."""
     import json
@@ -102,8 +142,8 @@ def create_room_json(request):
         secret_number = data.get('secret_number')
         username = data.get('username')
 
-        if not room_name or not username:
-            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        if not room_name or not username or not secret_number:
+            return JsonResponse({'error': 'Missing required fields (Room Name, Username, and Secret Number)'}, status=400)
 
         # Generate a unique slug
         base_slug = slugify(room_name)
@@ -118,8 +158,12 @@ def create_room_json(request):
                 persisted_users = ChatConsumer.ROOM_USERS.get(old_room.slug, {})
                 
                 # If the room is completely abandoned, it's safe to delete it to free up the name
+                # BUT ONLY IF THE USERNAME MATCHES!
                 if not active_conns and not persisted_users:
-                    old_room.delete()
+                    if old_room.owner_username == username:
+                        old_room.delete()
+                    else:
+                        return JsonResponse({'error': 'Room name already exists and is owned by someone else.'}, status=400)
                 else:
                     return JsonResponse({'error': 'Room name already exists and is currently in use'}, status=400)
 
@@ -129,6 +173,9 @@ def create_room_json(request):
             owner_username=username,
             secret_number=secret_number
         )
+        
+        # Store in session
+        request.session[f'room_secret_{room.slug}'] = secret_number
 
         return JsonResponse({
             'status': 'success',
@@ -239,7 +286,17 @@ def room(request, room_slug):
         return redirect(redirect_url) 
     # --- END STEP 3 IMPLEMENTATION ---
     
-    is_owner = (username == room_obj.owner_username)
+    # Verify ownership via session OR provided secret in URL
+    session_secret = request.session.get(f'room_secret_{room_slug}')
+    url_secret = request.GET.get('secret')
+    
+    is_owner = (username == room_obj.owner_username) and (
+        room_obj.secret_number == session_secret or room_obj.secret_number == url_secret
+    )
+    
+    # If the secret was provided in the URL and matches, save it to the session for future use
+    if url_secret and url_secret == room_obj.secret_number:
+        request.session[f'room_secret_{room_slug}'] = url_secret
 
     # --- START CACHING PREVENTION ---
     response = render(request, 'chat/room.html', {
