@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils.text import slugify
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -105,7 +106,7 @@ def create_room_json(request):
             return JsonResponse({'error': 'Missing required fields'}, status=400)
 
         # Generate a unique slug
-        base_slug = room_name.lower().replace(' ', '-')
+        base_slug = slugify(room_name)
         unique_slug = f"{base_slug}-{str(uuid.uuid4())[:8]}"
         
         # Check if room already exists with same name

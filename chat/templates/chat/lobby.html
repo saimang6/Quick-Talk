@@ -237,7 +237,10 @@
     document.addEventListener('click', async (e) => {
         if (e.target.classList.contains('join-request-button')) {
             const url = e.target.dataset.roomUrl;
-            window.location.href = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}`;
+            const roomOwner = e.target.dataset.roomOwner;
+            const isOwner = roomOwner === CURRENT_USERNAME;
+            const requestParam = isOwner ? "" : "&request=true";
+            window.location.href = `${url}?username=${encodeURIComponent(CURRENT_USERNAME)}${requestParam}`;
         }
 
         // --- ROOM DELETION LOGIC ---

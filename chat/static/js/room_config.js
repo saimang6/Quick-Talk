@@ -48,6 +48,8 @@ var requestOverlay = document.querySelector('#request-overlay');
 var overlayStatusMessage = document.querySelector('#overlay-status-message');
 var denialMessageDisplay = document.querySelector('#denial-message-display');
 var mainChatContainer = document.querySelector('.main-chat-container');
+var approvalOverlay = document.querySelector('#approval-overlay');
+var hasRequestQuery = new URLSearchParams(window.location.search).has('request');
 
 var requestsPanel = document.getElementById('requests-panel');
 var closeRequestsBtn = document.getElementById('close-requests-btn');

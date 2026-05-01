@@ -273,9 +273,15 @@ if (hamburgerMenuBtn) {
     hamburgerMenuBtn.addEventListener('click', toggleUserList);
 }
 if (sendJoinRequestBtn) sendJoinRequestBtn.addEventListener('click', sendJoinRequest);
-if (requestsPanel && requestToggleBtn && closeRequestsBtn) {
-    requestToggleBtn.addEventListener('click', () => requestsPanel.classList.toggle('hidden-panel'));
-    closeRequestsBtn.addEventListener('click', () => requestsPanel.classList.add('hidden-panel'));
+if (requestOverlay && requestToggleBtn && closeRequestsBtn) {
+    requestToggleBtn.addEventListener('click', () => {
+        requestOverlay.classList.toggle('hidden');
+        requestOverlay.classList.toggle('flex');
+    });
+    closeRequestsBtn.addEventListener('click', () => {
+        requestOverlay.classList.add('hidden');
+        requestOverlay.classList.remove('flex');
+    });
 }
 if (connectionReloadBtn) connectionReloadBtn.addEventListener('click', () => window.location.reload());
 if (connectionCancelBtn) connectionCancelBtn.addEventListener('click', () => {
@@ -451,12 +457,13 @@ document.addEventListener('click', (e) => {
 // ADDED: Request Panel Outside Click Logic
 document.addEventListener('mousedown', (e) => {
     // We use mousedown to catch the event before other focus events
-    if (requestsPanel && !requestsPanel.classList.contains('hidden-panel')) {
-        const isClickInsidePanel = requestsPanel.contains(e.target);
+    if (requestOverlay && !requestOverlay.classList.contains('hidden')) {
+        const isClickInsidePanel = requestsPanel && requestsPanel.contains(e.target);
         const isClickOnToggleBtn = requestToggleBtn && requestToggleBtn.contains(e.target);
 
         if (!isClickInsidePanel && !isClickOnToggleBtn) {
-            requestsPanel.classList.add('hidden-panel');
+            requestOverlay.classList.add('hidden');
+            requestOverlay.classList.remove('flex');
         }
     }
 });

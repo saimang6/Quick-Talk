@@ -14,7 +14,7 @@ class ChatConsumer(WebsocketConsumer):
     # --- CLASS-LEVEL STATE TRACKING ---
     # { 'room_slug': { 'username': 'channel_name' } } 
     ROOM_USERS = {} # ACTIVE, APPROVED USERS ONLY
-    USER_LAST_SEEN = {} 
+    USER_LAST_SEEN = {} # { 'room_slug': { 'username': timestamp } } 
     ROOM_TYPERS = {}
     # { 'room_slug': 'owner_channel_name' } - Maps slug directly to owner's channel
     ROOM_OWNER_CHANNELS = {} 
@@ -121,6 +121,9 @@ class ChatConsumer(WebsocketConsumer):
         # Mark this user as ACTIVELY CONNECTED
         self.ROOM_ACTIVE_CONNECTIONS[self.room_slug].add(self.username)
         
+        # Initialize last seen for this room if not exists
+        self.USER_LAST_SEEN.setdefault(self.room_slug, {})
+        
         # --- CRITICAL FIX: Determine initial pending state ---
         # 1. First, check if the client URL indicates a join request.
         is_request_attempt = is_request_join and not self.is_owner
@@ -137,7 +140,10 @@ class ChatConsumer(WebsocketConsumer):
         
         self.is_pending = not self.is_owner and not is_active_in_room
         # ----------------------------------------------------------------------
-
+        
+        # Determine if this is truly a timeout (was active in this room before)
+        is_returning_to_room = self.username in self.USER_LAST_SEEN.get(self.room_slug, {})
+        
         # --- NEW CONNECTION LOGIC: PENDING VS ACTIVE ---
         
         if self.is_pending:
@@ -148,7 +154,7 @@ class ChatConsumer(WebsocketConsumer):
             self.send(text_data=json.dumps({
                 'type': 'session_status',
                 'status': 'pending', 
-                'reason': 'timeout' if not is_new_room and not is_request_join else 'new_join'
+                'reason': 'timeout' if is_returning_to_room and not is_new_room and not is_request_join else 'new_join'
             }))
             
             # 1. PENDING: Only track their channel for direct messages (approval/denial)
@@ -170,10 +176,15 @@ class ChatConsumer(WebsocketConsumer):
                              'requester_username': self.username,
                          }
                      )
-            
         else:
             # ACTIVE/OWNER LOGIC
             
+            # 0. Notify client of active status
+            self.send(text_data=json.dumps({
+                'type': 'session_status',
+                'status': 'active'
+            }))
+
             # 1. Add user's channel to the main Channel Layer Group
             print(f"Adding user {self.username} to group {self.room_group_name}...")
             async_to_sync(self.channel_layer.group_add)(
@@ -192,7 +203,7 @@ class ChatConsumer(WebsocketConsumer):
             
             # 4. Execute Join Logic (Update last seen)
             if user_joined:
-                self.USER_LAST_SEEN[self.username] = timezone.now()
+                self.USER_LAST_SEEN[self.room_slug][self.username] = timezone.now()
                 
             # 5. Broadcast the updated user list
             self.broadcast_user_list(send_join_message=False)
@@ -216,13 +227,14 @@ class ChatConsumer(WebsocketConsumer):
         # --- CATCH-UP LOGIC START ---
         # Only send history to users who are ACTIVE
         if not self.is_pending:
-            last_seen_time = self.USER_LAST_SEEN.get(self.username)
+            last_seen_time = self.USER_LAST_SEEN.get(self.room_slug, {}).get(self.username)
             if last_seen_time:
                  self.send_catch_up_messages(last_seen_time)
         # ------------------------------------------------------------------
 
     def disconnect(self, close_code):
-        self.USER_LAST_SEEN[self.username] = timezone.now()
+        if self.room_slug in self.USER_LAST_SEEN:
+            self.USER_LAST_SEEN[self.room_slug][self.username] = timezone.now()
         
         # Remove from ACTIVE CONNECTIONS (Current socket is dead)
         if self.room_slug in self.ROOM_ACTIVE_CONNECTIONS:
@@ -1002,7 +1014,7 @@ class ChatConsumer(WebsocketConsumer):
             if username in active_connections:
                 continue
 
-            last_seen = self.USER_LAST_SEEN.get(username)
+            last_seen = self.USER_LAST_SEEN.get(self.room_slug, {}).get(username)
             if last_seen:
                 diff = (now - last_seen).total_seconds()
                 if diff > STALE_TIMEOUT_SECONDS:

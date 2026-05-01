@@ -13,11 +13,11 @@ urlpatterns = [
     # 2b. API Endpoint for Room List (JSON)
     path('api/rooms/', views.get_rooms_json, name='get_rooms_json'),
     path('api/rooms/create/', views.create_room_json, name='create_room_json'),
-    path('api/rooms/<slug:room_slug>/delete/', views.delete_room_json, name='delete_room_json'),
+    path('api/rooms/<str:room_slug>/delete/', views.delete_room_json, name='delete_room_json'),
     
     # 3. Dynamic Chat Room URL (uses room slug)
-    path('room/<slug:room_slug>/', views.room, name='room'),
+    path('room/<str:room_slug>/', views.room, name='room'),
 
     # 4. File Upload Endpoint
-    path('room/<slug:room_slug>/upload/', views.upload_attachment, name='upload_attachment'),
+    path('room/<str:room_slug>/upload/', views.upload_attachment, name='upload_attachment'),
 ]

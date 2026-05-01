@@ -100,8 +100,17 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
 
     const messageBubble = document.createElement('div');
     messageBubble.classList.add(isSystemMessage ? 'system-message-bubble' : 'message-bubble');
-    if (!isSystemMessage) messageBubble.classList.add(isMe ? 'message-mine' : 'message-other');
-
+    
+    if (isSystemMessage) {
+        // Strip background and bubble-like styling for system messages
+        messageBubble.style.background = 'transparent';
+        messageBubble.style.border = 'none';
+        messageBubble.style.boxShadow = 'none';
+        messageBubble.style.padding = '0.5rem';
+        messageBubble.style.color = '#94a3b8'; // text-slate-400
+    } else {
+        messageBubble.classList.add(isMe ? 'message-mine' : 'message-other');
+    }
     if (!isSystemMessage && !isMe) {
         const senderSpan = document.createElement('span');
         senderSpan.classList.add('message-sender');
@@ -253,13 +262,15 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
     }
 
     // --- REACTION CONTAINER ---
-    const reactionContainer = document.createElement('div');
-    reactionContainer.id = `reactions-${messageId}`;
-    reactionContainer.classList.add('reaction-container');
-    messageBubble.appendChild(reactionContainer);
+    if (!isSystemMessage) {
+        const reactionContainer = document.createElement('div');
+        reactionContainer.id = `reactions-${messageId}`;
+        reactionContainer.classList.add('reaction-container');
+        messageBubble.appendChild(reactionContainer);
 
-    // Initial Render
-    updateMessageReactions(messageId, reactions);
+        // Initial Render
+        updateMessageReactions(messageId, reactions);
+    }
 
     chatLogDom.appendChild(messageWrapper);
 
@@ -467,33 +478,80 @@ function displayRequestCard(requester, updateCount = true) {
 
     const requestWrapper = document.createElement('div');
     requestWrapper.id = requestId;
-    requestWrapper.classList.add('request-card-wrapper', 'system-message-wrapper');
+    // Premium, compact list item design
+    requestWrapper.classList.add(
+        'flex', 'items-center', 'justify-between', 'p-3', 'mb-2', 
+        'bg-slate-800/40', 'hover:bg-slate-800/80', 'border', 'border-slate-700/50', 
+        'rounded-2xl', 'transition-colors', 'animate-fadeIn'
+    );
 
-    const card = document.createElement('div');
-    card.classList.add('request-card-bubble', 'system-message-bubble');
+    // Left Side: Avatar and User Info
+    const userInfoDiv = document.createElement('div');
+    userInfoDiv.classList.add('flex', 'items-center', 'gap-3', 'overflow-hidden');
 
-    const messageP = document.createElement('p');
-    messageP.classList.add('request-message-text');
-    messageP.innerHTML = `**${requester}** is requesting to join.`;
+    const avatar = document.createElement('div');
+    avatar.classList.add(
+        'flex-shrink-0', 'w-10', 'h-10', 'bg-gradient-to-br', 'from-amber-400', 'to-orange-500', 
+        'rounded-full', 'flex', 'items-center', 'justify-center', 'text-white', 'font-bold', 'shadow-inner'
+    );
+    avatar.textContent = requester.charAt(0).toUpperCase();
 
+    const textDiv = document.createElement('div');
+    textDiv.classList.add('flex', 'flex-col', 'truncate');
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('text-slate-200', 'font-semibold', 'truncate');
+    nameSpan.textContent = requester;
+
+    const subSpan = document.createElement('span');
+    subSpan.classList.add('text-slate-400', 'text-xs', 'truncate');
+    subSpan.textContent = 'wants to join';
+
+    textDiv.appendChild(nameSpan);
+    textDiv.appendChild(subSpan);
+    userInfoDiv.appendChild(avatar);
+    userInfoDiv.appendChild(textDiv);
+
+    // Right Side: Action Buttons
     const buttonGroup = document.createElement('div');
-    buttonGroup.classList.add('request-button-group');
+    buttonGroup.classList.add('flex', 'items-center', 'gap-2', 'flex-shrink-0', 'ml-3');
 
     const acceptBtn = document.createElement('button');
-    acceptBtn.textContent = 'Accept';
-    acceptBtn.classList.add('request-accept-btn');
+    acceptBtn.innerHTML = '<i class="fas fa-check text-lg"></i>';
+    acceptBtn.title = 'Accept';
+    // Use inline styles to bypass Tailwind compilation issues for specific sizes/colors
+    acceptBtn.style.width = '44px';
+    acceptBtn.style.height = '44px';
+    acceptBtn.style.borderRadius = '12px';
+    acceptBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+    acceptBtn.classList.add(
+        'flex', 'items-center', 'justify-center', 
+        'text-emerald-500', 'hover:bg-emerald-500', 'hover:text-white', 
+        'hover:-translate-y-0.5', 'hover:shadow-lg', 
+        'transition-all', 'duration-200'
+    );
     acceptBtn.onclick = () => sendApprovalDecision('accept', requester);
 
     const denyBtn = document.createElement('button');
-    denyBtn.textContent = 'Deny';
-    denyBtn.classList.add('request-deny-btn');
+    denyBtn.innerHTML = '<i class="fas fa-times text-lg"></i>';
+    denyBtn.title = 'Deny';
+    denyBtn.style.width = '44px';
+    denyBtn.style.height = '44px';
+    denyBtn.style.borderRadius = '12px';
+    denyBtn.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
+    denyBtn.classList.add(
+        'flex', 'items-center', 'justify-center', 
+        'text-rose-500', 'hover:bg-rose-500', 'hover:text-white', 
+        'hover:-translate-y-0.5', 'hover:shadow-lg',
+        'transition-all', 'duration-200'
+    );
     denyBtn.onclick = () => sendApprovalDecision('deny', requester);
 
     buttonGroup.appendChild(acceptBtn);
     buttonGroup.appendChild(denyBtn);
-    card.appendChild(messageP);
-    card.appendChild(buttonGroup);
-    requestWrapper.appendChild(card);
+
+    requestWrapper.appendChild(userInfoDiv);
+    requestWrapper.appendChild(buttonGroup);
 
     pendingRequestsContainer.appendChild(requestWrapper);
 

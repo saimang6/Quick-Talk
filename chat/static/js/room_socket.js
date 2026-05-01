@@ -1083,26 +1083,19 @@ function connectWebSocket() {
     }
 
     // Check if the URL currently has the "request" parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasRequestQuery = urlParams.has('request');
-
-    if (isPendingUser && hasRequestQuery) {
-        if (mainChatContainer) {
-            mainChatContainer.style.display = 'none'; // Inline override
-            mainChatContainer.classList.add('hidden-chat-interface'); // Class override
-        }
-        if (requestOverlay) requestOverlay.style.display = 'flex';
-    } else {
+    if (isOwner) {
         if (mainChatContainer) {
             mainChatContainer.style.display = 'flex';
             mainChatContainer.classList.remove('hidden-chat-interface');
         }
-        if (requestOverlay) requestOverlay.style.display = 'none';
-
-        if (!hasRequestQuery) {
-            isPendingUser = false;
-            isAccessGranted = true;
+        if (approvalOverlay) approvalOverlay.classList.add('hidden');
+    } else {
+        // Non-owners start hidden/pending by default until server says otherwise
+        if (mainChatContainer) {
+            mainChatContainer.style.display = 'none';
+            mainChatContainer.classList.add('hidden-chat-interface');
         }
+        if (approvalOverlay) approvalOverlay.classList.remove('hidden');
     }
 
     if (chatSocket && (chatSocket.readyState === WebSocket.OPEN || chatSocket.readyState === WebSocket.CONNECTING)) return;
@@ -1150,6 +1143,9 @@ function handleSocketOpen() {
 
                 console.log("Auto-Send: Sending message after socket opened.");
                 sendMessage();
+            } else if (isPendingUser && hasRequestQuery) {
+                console.log("Auto-Send: Sending join request automatically.");
+                sendJoinRequest();
             } else {
                 console.log("Auto-Send: Skipped - user doesn't have access yet.");
             }
@@ -1283,7 +1279,10 @@ function sendApprovalDecision(decision, requesterName) {
             if (currentCount > 0) requestCountSpan.textContent = currentCount - 1;
 
             const newCount = parseInt(requestCountSpan.textContent);
-            if (newCount === 0) requestsPanel.classList.add('hidden-panel');
+            if (newCount === 0 && requestOverlay) {
+                requestOverlay.classList.add('hidden');
+                requestOverlay.classList.remove('flex');
+            }
 
             updateRequestPanelContent();
             updateBellIconColor(newCount);
@@ -1373,7 +1372,7 @@ function handleSocketMessage(e) {
 
         case 'access_granted':
             if (!isOwner && !isAccessGranted && isPendingUser) {
-                if (requestOverlay) requestOverlay.style.display = 'none';
+                if (approvalOverlay) approvalOverlay.classList.add('hidden');
                 if (mainChatContainer) {
                     mainChatContainer.classList.remove('hidden-chat-interface');
                     mainChatContainer.style.display = 'flex';
@@ -1624,6 +1623,19 @@ function handleSocketMessage(e) {
                         }
                     });
                 }
+            } else if (data.status === 'active') {
+                console.log("Session Status: Active");
+                isAccessGranted = true;
+                isPendingUser = false;
+
+                // Hide any overlays if they were showing
+                if (approvalOverlay) approvalOverlay.classList.add('hidden');
+                if (mainChatContainer) {
+                    mainChatContainer.classList.remove('hidden-chat-interface');
+                    mainChatContainer.style.display = 'flex';
+                }
+                const approvalMessageDisplay = document.getElementById('awaiting-approval-message');
+                if (approvalMessageDisplay) approvalMessageDisplay.classList.add('hidden');
             }
             break;
 
