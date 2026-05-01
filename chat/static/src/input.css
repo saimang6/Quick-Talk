@@ -100,6 +100,10 @@
     @apply max-w-[85%] px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed transition-all cursor-pointer relative;
   }
 
+  .full-link {
+    @apply text-blue-400 underline decoration-blue-400/50 hover:text-blue-300 hover:decoration-blue-300 transition-all font-medium;
+  }
+
   .message-mine {
     @apply bg-indigo-600 text-white rounded-br-none self-end border border-indigo-500/50;
   }
@@ -113,7 +117,7 @@
   }
 
   .message-timestamp {
-    @apply block text-[10px] text-slate-500 mt-2 text-right opacity-70;
+    @apply block text-[10px] text-white mt-2 text-right opacity-90;
   }
 
   .system-message-bubble {

@@ -165,7 +165,7 @@ def create_room_json(request):
                     else:
                         return JsonResponse({'error': 'Room name already exists and is owned by someone else.'}, status=400)
                 else:
-                    return JsonResponse({'error': 'Room name already exists and is currently in use'}, status=400)
+                    return JsonResponse({'error': 'Room name already exists and is currently in use. Please try with different room name.'}, status=400)
 
         room = Room.objects.create(
             name=room_name,

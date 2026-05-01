@@ -211,6 +211,7 @@ class ChatConsumer(WebsocketConsumer):
             # 4. Execute Join Logic (Update last seen)
             if user_joined:
                 self.USER_LAST_SEEN[self.room_slug][self.username] = timezone.now()
+                self.send_system_message(f"{self.username} has joined the room.")
                 
             # 5. Broadcast the updated user list
             self.broadcast_user_list(send_join_message=False)
@@ -296,6 +297,7 @@ class ChatConsumer(WebsocketConsumer):
         # 5. If the user truly left (was removed from ROOM_USERS), broadcast the update
         if user_left:
             self.broadcast_user_list(send_join_message=False)
+            self.send_system_message(f"{self.username} has left the room.")
             
             # Note: Automatic room deletion when empty is now disabled.
             # Owners must delete rooms manually from the lobby.
@@ -538,7 +540,7 @@ class ChatConsumer(WebsocketConsumer):
                 self.broadcast_user_list(send_join_message=False) 
 
                 # 7. Send system message
-                # self.send_system_message(f"{requester_username} has joined the room.")
+                self.send_system_message(f"{requester_username} has joined the room.")
 
             else:
                 print(f"Cannot accept request: Requester {requester_username} not found in blocked list or already accepted.")

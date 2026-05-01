@@ -314,8 +314,8 @@ if (joinCallBtn) {
 
 // --- FILE UPLOAD LISTENERS ---
 if (attachmentBtn && fileInputDom) {
-    attachmentBtn.onclick = () => fileInputDom.click();
-
+    // Label triggers the input click automatically via 'for="attachment-input"'
+    
     fileInputDom.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -421,7 +421,7 @@ if (deleteCancelBtn) deleteCancelBtn.onclick = () => {
 // Emoji Picker Logic
 if (emojiToggleBtn) emojiToggleBtn.addEventListener('click', () => {
     pickerOpen = !pickerOpen;
-    pickerContainer.classList.toggle('open', pickerOpen);
+    if (pickerContainer) pickerContainer.classList.toggle('open', pickerOpen);
 });
 
 if (emojiPicker && messageInputDom) {
@@ -449,7 +449,7 @@ document.addEventListener('click', (e) => {
     const isClickInside = (pickerContainer && pickerContainer.contains(e.target)) || (emojiToggleBtn && emojiToggleBtn.contains(e.target));
 
     if (pickerOpen && !isClickInside) {
-        pickerContainer.classList.remove('open');
+        if (pickerContainer) pickerContainer.classList.remove('open');
         pickerOpen = false;
     }
 });

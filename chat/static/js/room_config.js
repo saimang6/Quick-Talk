@@ -12,7 +12,7 @@ var isOwner = JSON.parse(document.getElementById('is-owner').textContent);
 var messageInputDom = document.querySelector('#chat-message-input');
 var submitButtonDom = document.querySelector('#chat-message-submit');
 var chatLogDom = document.querySelector('#chat-log');
-var fileInputDom = document.querySelector('#file-input');
+var fileInputDom = document.querySelector('#attachment-input');
 var attachmentBtn = document.querySelector('#attachment-btn');
 var deleteSelectedBtn = document.querySelector('#delete-selected-btn');
 var leaveRoomBtn = document.querySelector('#leave-room-btn');
@@ -62,7 +62,7 @@ var currentUserDisplay = document.querySelector('#current-user-display');
 var emojiToggleBtn = document.getElementById('emoji-toggle-btn');
 var emojiPickerPopover = document.getElementById('emoji-picker-popover');
 var emojiPickerElement = document.querySelector('emoji-picker');
-var pickerContainer = document.getElementById('emoji-picker-container');
+var pickerContainer = document.getElementById('emoji-picker-popover');
 var emojiPicker = pickerContainer ? pickerContainer.querySelector('emoji-picker') : null; // Safely select emoji picker
 
 // --- STATE VARIABLES ---

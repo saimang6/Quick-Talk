@@ -857,6 +857,23 @@ html, body {
   transition-duration: 150ms;
 }
 
+.full-link {
+  --tw-text-opacity: 1;
+  color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+  text-decoration-line: underline;
+  text-decoration-color: rgb(96 165 250 / 0.5);
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  font-weight: 500;
+}
+
+.full-link:hover {
+  --tw-text-opacity: 1;
+  color: rgb(147 197 253 / var(--tw-text-opacity, 1));
+  text-decoration-color: rgb(147 197 253 / 1);
+}
+
 .message-mine {
   align-self: flex-end;
   border-bottom-right-radius: 0px;
@@ -896,8 +913,8 @@ html, body {
   text-align: right;
   font-size: 10px;
   --tw-text-opacity: 1;
-  color: rgb(100 116 139 / var(--tw-text-opacity, 1));
-  opacity: 0.7;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+  opacity: 0.9;
 }
 
 .system-message-bubble {

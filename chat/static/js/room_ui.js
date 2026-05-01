@@ -102,12 +102,7 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
     messageBubble.classList.add(isSystemMessage ? 'system-message-bubble' : 'message-bubble');
     
     if (isSystemMessage) {
-        // Strip background and bubble-like styling for system messages
-        messageBubble.style.background = 'transparent';
-        messageBubble.style.border = 'none';
-        messageBubble.style.boxShadow = 'none';
-        messageBubble.style.padding = '0.5rem';
-        messageBubble.style.color = '#94a3b8'; // text-slate-400
+        // Use class 'system-message-bubble' from CSS
     } else {
         messageBubble.classList.add(isMe ? 'message-mine' : 'message-other');
     }
