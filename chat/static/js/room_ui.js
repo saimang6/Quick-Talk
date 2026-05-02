@@ -147,9 +147,9 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
         if (isImage) {
             const img = document.createElement('img');
             img.src = attachmentUrl;
-            img.style.maxWidth = '200px';
-            img.style.maxHeight = '200px';
-            img.style.borderRadius = '8px';
+            img.style.maxWidth = '300px';
+            img.style.maxHeight = '300px';
+            img.style.borderRadius = '12px';
             img.style.cursor = 'pointer';
             img.onclick = () => window.open(attachmentUrl, '_blank');
             attachmentContainer.appendChild(img);
@@ -568,6 +568,8 @@ function confirmAndLeave() {
 
         setTimeout(() => {
             sessionStorage.setItem('user_left_room', 'true');
+            // Clear the access granted flag so re-entry requires fresh approval
+            sessionStorage.removeItem(`access_granted_${roomSlug}`);
             const redirectUrl = `/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`;
             window.location.replace(redirectUrl);
         }, 150);
@@ -628,6 +630,8 @@ window.cancelJoinAndLeave = function() {
             }
 
             setTimeout(() => {
+                // Clear the access granted flag so re-entry requires fresh approval
+                sessionStorage.removeItem(`access_granted_${roomSlug}`);
                 window.location.replace(`/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`);
             }, 100);
         }
@@ -784,18 +788,7 @@ if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPicke
     });
 }
 
-if (typeof emojiPickerElement !== 'undefined' && emojiPickerElement && typeof messageInputDom !== 'undefined' && messageInputDom) {
-    emojiPickerElement.addEventListener('emoji-click', event => {
-        const emoji = event.detail.emoji.unicode;
-        const start = messageInputDom.selectionStart;
-        const end = messageInputDom.selectionEnd;
-        const value = messageInputDom.value;
-        
-        messageInputDom.value = value.substring(0, start) + emoji + value.substring(end);
-        messageInputDom.selectionStart = messageInputDom.selectionEnd = start + emoji.length;
-        messageInputDom.focus();
-    });
-}
+
 
 document.addEventListener('click', (e) => {
     if (typeof emojiPickerPopover !== 'undefined' && emojiPickerPopover && typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn) {

@@ -1442,19 +1442,22 @@ function handleSocketMessage(e) {
         case 'participant_removed':
             // Participant was removed by the room owner
             if (!isOwner) {
-                const removedBy = data.removed_by || 'the room owner';
+                const removedBy = data.removed_by || 'the owner';
 
                 Swal.fire({
-                    title: 'Removed from Room',
-                    html: `You have been removed from this room by <strong>${removedBy}</strong>.`,
-                    icon: 'warning',
-                    confirmButtonColor: '#DC2626',
-                    confirmButtonText: 'Return to Lobby',
+                    title: 'Removed from Room 🚪',
+                    html: `The owner (<strong>${removedBy}</strong>) has removed you from the room.`,
+                    icon: 'error',
+                    timer: 5000,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
                     allowOutsideClick: false,
                     allowEscapeKey: false
                 }).then(() => {
                     isUserLeaving = true;
-                    disableExitPrevention();
+                    // Clear the access granted flag so re-entry requires fresh approval
+                    sessionStorage.removeItem(`access_granted_${roomSlug}`);
+                    if (typeof disableExitPrevention === 'function') disableExitPrevention();
                     if (chatSocket) chatSocket.close();
                     window.location.assign(`/chat/lobby/?username=${fixedUsername}`);
                 });
@@ -1477,7 +1480,9 @@ function handleSocketMessage(e) {
                     allowEscapeKey: false
                 }).then(() => {
                     isUserLeaving = true;
-                    disableExitPrevention();
+                    // Clear the access granted flag so re-entry requires fresh approval
+                    sessionStorage.removeItem(`access_granted_${roomSlug}`);
+                    if (typeof disableExitPrevention === 'function') disableExitPrevention();
                     window.location.replace(`/chat/lobby/?username=${encodeURIComponent(fixedUsername)}`);
                 });
             } else {

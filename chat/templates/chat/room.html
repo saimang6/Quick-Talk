@@ -17,6 +17,86 @@
     .message-bubble { max-width: 85%; }
     
     .hidden-chat-interface { display: none !important; }
+
+    /* GIF Picker Styles */
+    .gif-picker-container {
+        position: fixed;
+        z-index: 12000;
+        width: 320px;
+        height: 420px;
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 20px;
+        flex-direction: column;
+        overflow: hidden;
+        display: none; /* Hidden by default */
+    }
+    .gif-picker-header {
+        padding: 12px;
+        border-bottom: 1px solid #1e293b;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: #1e293b/50;
+    }
+    #gif-search-input {
+        flex-grow: 1;
+        background: #020617;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 8px 12px;
+        color: white;
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    #gif-search-input:focus {
+        border-color: #6366f1;
+    }
+    #close-gif-picker {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        background: transparent;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    #close-gif-picker:hover {
+        background: #ef4444/10;
+        color: #ef4444;
+    }
+    .gif-results {
+        flex-grow: 1;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 12px;
+    }
+    .gif-item {
+        width: 100%;
+        height: 110px;
+        object-fit: cover;
+        cursor: pointer;
+        border-radius: 12px;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+    .gif-item:hover {
+        transform: translateY(-2px);
+        border-color: #6366f1;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    .no-results, .error {
+        grid-column: span 2;
+        text-align: center;
+        padding: 40px 10px;
+        color: #94a3b8;
+        font-size: 0.875rem;
+    }
 </style>
 {% endblock %}
 
@@ -124,11 +204,14 @@
 
                 <div class="flex gap-3 items-end">
                     <div class="emoji-input-container">
-                        <button id="emoji-toggle-btn" class="p-3 text-slate-500 hover:text-indigo-400 transition-colors">
+                        <button id="emoji-toggle-btn" class="p-3 text-slate-500 hover:text-indigo-400 transition-colors" title="Emoji">
                             <i class="far fa-smile text-xl"></i>
                         </button>
+                        <button id="gif-toggle-btn" class="p-3 text-slate-500 hover:text-indigo-400 transition-colors" title="GIF">
+                            <i class="fas fa-film text-xl"></i>
+                        </button>
                         <input id="chat-message-input" type="text" class="message-input" placeholder="Type a message or @mention someone...">
-                        <label for="attachment-input" id="attachment-btn" class="p-3 text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors">
+                        <label for="attachment-input" id="attachment-btn" class="p-3 text-slate-500 hover:text-indigo-400 cursor-pointer transition-colors" title="Attach File">
                             <i class="fas fa-paperclip text-lg"></i>
                             <input id="attachment-input" type="file" class="hidden">
                         </label>
@@ -199,6 +282,16 @@
 <!-- Emoji Picker Popover -->
 <div id="emoji-picker-popover" class="fixed z-[12000] hidden shadow-2xl animate-scaleIn">
     <emoji-picker class="dark"></emoji-picker>
+</div>
+
+<!-- GIF Picker Popover -->
+<div id="gif-picker-container" class="gif-picker-container hidden shadow-2xl animate-scaleIn">
+    <div class="gif-picker-header">
+        <input type="text" id="gif-search-input" placeholder="Search GIPHY...">
+    </div>
+    <div id="gif-results" class="gif-results custom-scrollbar">
+        <!-- Results injected via JS -->
+    </div>
 </div>
 
 <!-- VOIP Call Modal -->
