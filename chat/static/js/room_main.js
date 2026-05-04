@@ -418,37 +418,6 @@ if (deleteCancelBtn) deleteCancelBtn.onclick = () => {
     if (deleteModal) deleteModal.style.display = 'none';
 };
 
-// Emoji Picker Logic
-if (emojiToggleBtn) emojiToggleBtn.addEventListener('click', () => {
-    pickerOpen = !pickerOpen;
-    if (pickerContainer) pickerContainer.classList.toggle('open', pickerOpen);
-});
-
-if (emojiPicker && messageInputDom) {
-    emojiPicker.addEventListener('emoji-click', event => {
-        event.stopPropagation();
-        const emoji = event.detail.emoji.unicode;
-
-        const start = messageInputDom.selectionStart;
-        const end = messageInputDom.selectionEnd;
-
-        const value = messageInputDom.value;
-        messageInputDom.value = value.substring(0, start) + emoji + value.substring(end);
-
-        messageInputDom.selectionStart = messageInputDom.selectionEnd = start + emoji.length;
-
-        messageInputDom.focus();
-    });
-}
-
-document.addEventListener('click', (e) => {
-    const isClickInside = (pickerContainer && pickerContainer.contains(e.target)) || (emojiToggleBtn && emojiToggleBtn.contains(e.target));
-
-    if (pickerOpen && !isClickInside) {
-        if (pickerContainer) pickerContainer.classList.remove('open');
-        pickerOpen = false;
-    }
-});
 
 // ADDED: Request Panel Outside Click Logic
 document.addEventListener('mousedown', (e) => {
@@ -466,9 +435,8 @@ document.addEventListener('mousedown', (e) => {
 
 if (messageInputDom) {
     messageInputDom.addEventListener('keydown', () => {
-        if (pickerOpen) {
-            pickerContainer.classList.remove('open');
-            pickerOpen = false;
+        if (emojiPickerPopover && !emojiPickerPopover.classList.contains('hidden')) {
+            emojiPickerPopover.classList.add('hidden');
         }
     });
 }

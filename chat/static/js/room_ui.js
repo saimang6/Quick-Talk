@@ -779,6 +779,16 @@ function cancelReply() {
 if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPickerPopover !== 'undefined' && emojiPickerPopover) {
     emojiToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+
+        // --- MUTUAL EXCLUSION: Close GIF Picker if opening Emoji Picker ---
+        const gifPicker = document.getElementById('gif-picker-container');
+        if (gifPicker && !gifPicker.classList.contains('hidden') && emojiPickerPopover.classList.contains('hidden')) {
+            gifPicker.classList.add('hidden');
+            gifPicker.style.display = 'none';
+            const gifBtn = document.getElementById('gif-toggle-btn');
+            if (gifBtn) gifBtn.classList.remove('text-indigo-400');
+        }
+
         emojiPickerPopover.classList.toggle('hidden');
         
         // Position the picker above the button
@@ -786,6 +796,28 @@ if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPicke
         emojiPickerPopover.style.bottom = `${window.innerHeight - rect.top + 10}px`;
         emojiPickerPopover.style.left = `${rect.left}px`;
     });
+
+    // --- NEW: Emoji Click Listener ---
+    const emojiPickerElement = document.querySelector('emoji-picker');
+    if (emojiPickerElement) {
+        emojiPickerElement.addEventListener('emoji-click', event => {
+            event.stopPropagation();
+            const emoji = event.detail.emoji.unicode;
+
+            if (messageInputDom) {
+                const start = messageInputDom.selectionStart;
+                const end = messageInputDom.selectionEnd;
+                const value = messageInputDom.value;
+
+                messageInputDom.value = value.substring(0, start) + emoji + value.substring(end);
+                
+                // Move cursor to after the inserted emoji
+                const newPos = start + emoji.length;
+                messageInputDom.setSelectionRange(newPos, newPos);
+                messageInputDom.focus();
+            }
+        });
+    }
 }
 
 
