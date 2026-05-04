@@ -479,6 +479,9 @@ async function startVoiceCall() {
         }
 
         showCallInterface();
+
+        // Start pinger so other users see the "Join Call" bar
+        startActiveCallPinger('voice');
     } catch (err) {
         console.error("Could not start voice call:", err);
         Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');
@@ -556,6 +559,9 @@ async function startVideoCall() {
         showVideoCallInterface();
 
         displayMessage('System', '📹 Starting video call...', 'video-start-' + Date.now());
+
+        // Start pinger so other users see the "Join Call" bar
+        startActiveCallPinger('video');
 
     } catch (err) {
         console.error("Could not start video call:", err);

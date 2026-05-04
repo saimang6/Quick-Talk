@@ -875,14 +875,6 @@ class ChatConsumer(WebsocketConsumer):
             'call_type': event['call_type']
         }))
 
-        if should_send:
-            # Send signal to the client
-            self.send(text_data=json.dumps({
-                'type': 'webrtc_signal',
-                'data': event['data'],
-                'sender': event['sender']
-            }))
-
 
     # def webrtc_signal_handler(self, event):
     #     # Only send to the browser if they are the intended recipient

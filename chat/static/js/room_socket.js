@@ -65,6 +65,7 @@ let pendingCallData = null; // Stores incoming offer while waiting for Accept/De
 let isVideoCall = false; // Flag to differentiate video call from voice call
 let isCameraMuted = false; // Track camera on/off state
 let pendingVideoCallData = null; // Stores incoming video offer while waiting for Accept/Deny
+let pendingVideoCallQueue = []; // Queue for additional video offers that arrive before Accept/Deny
 
 // Multi-peer connection support for group calls
 let peerConnections = new Map(); // Map of peerId (username) -> RTCPeerConnection
@@ -106,6 +107,9 @@ function cleanupWebRTC(keepQueue = false) {
         iceCandidateQueue = [];
         iceCandidateQueues.clear();
     }
+
+    // 3b. Clear pending video call queue
+    pendingVideoCallQueue = [];
 
     // --- NEW: Send Leave Call Signal ---
     if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
@@ -1587,8 +1591,26 @@ function handleSocketMessage(e) {
             break;
 
         case 'leave_call':
-            if (typeof removeVideoTile === 'function') {
-                removeVideoTile(data.sender);
+            console.log(`User ${data.sender} left the call.`);
+            displayMessage('System', `📞 ${data.sender} left the call.`, 'call-left-' + Date.now());
+
+            if (isVideoCall) {
+                // Remove their video tile and peer connection
+                if (typeof removeVideoTile === 'function') {
+                    removeVideoTile(data.sender);
+                }
+
+                // Check if we are the last person remaining (only local tile left)
+                const videoGrid = document.getElementById('video-grid');
+                const remoteTiles = videoGrid ? videoGrid.querySelectorAll('.video-tile:not(.local-tile)') : [];
+                if (remoteTiles.length === 0 && peerConnections.size === 0) {
+                    displayMessage('System', '📞 Everyone left the call. Call ended.', 'call-ended-' + Date.now());
+                    cleanupWebRTC();
+                }
+            } else if (peerConnection) {
+                // Voice call — the other person left, end the call
+                displayMessage('System', '📞 Call ended.', 'call-ended-' + Date.now());
+                cleanupWebRTC();
             }
             break;
 
@@ -1819,13 +1841,19 @@ async function handleIncomingCall(offer, sender) {
     }
 
     if (hasVideo) {
-        // This is a NEW video call
-        pendingVideoCallData = { offer, sender };
-        isVideoCall = true;
+        if (pendingVideoCallData) {
+            // Already have a pending call — queue this additional offer
+            console.log(`Queueing video offer from ${sender} (already have pending from ${pendingVideoCallData.sender})`);
+            pendingVideoCallQueue.push({ offer, sender });
+        } else {
+            // This is the first / NEW video call offer
+            pendingVideoCallData = { offer, sender };
+            isVideoCall = true;
 
-        // Show video call overlay in "Incoming" mode
-        showVideoCallInterface(true);
-        displayMessage('System', `📹 Incoming video call from ${sender}...`, 'video-incoming-' + Date.now());
+            // Show video call overlay in "Incoming" mode
+            showVideoCallInterface(true);
+            displayMessage('System', `📹 Incoming video call from ${sender}...`, 'video-incoming-' + Date.now());
+        }
     } else {
         // This is a voice call
         pendingCallData = { offer, sender };
@@ -2021,8 +2049,40 @@ async function acceptVideoCall() {
         console.log("=== VIDEO CALL ACCEPTED AND CONNECTED ===");
         displayMessage('System', '📹 Video call connected.', 'video-answering-' + Date.now());
 
-        // --- NEW: INITIATE CONNECTIONS TO REST OF MESH ---
+        // --- PROCESS QUEUED OFFERS (from other participants who sent offers before we accepted) ---
+        console.log(`Processing ${pendingVideoCallQueue.length} queued video offers...`);
+        while (pendingVideoCallQueue.length > 0) {
+            const queued = pendingVideoCallQueue.shift();
+            console.log(`Processing queued offer from: ${queued.sender}`);
+            try {
+                createVideoTile(queued.sender);
+                const qpc = await createPeerConnectionForUser(queued.sender);
+                await qpc.setRemoteDescription(new RTCSessionDescription(queued.offer));
+
+                // Process queued ICE candidates for this peer
+                const qQueue = iceCandidateQueues.get(queued.sender) || [];
+                while (qQueue.length > 0) {
+                    try { await qpc.addIceCandidate(new RTCIceCandidate(qQueue.shift())); } catch(e) {}
+                }
+
+                const qAnswer = await qpc.createAnswer();
+                await qpc.setLocalDescription(qAnswer);
+                chatSocket.send(JSON.stringify({
+                    'type': 'webrtc_signal',
+                    'data': qAnswer,
+                    'target_users': [queued.sender]
+                }));
+                displayMessage('System', `📹 ${queued.sender} joined the video call.`, 'video-join-q-' + Date.now());
+            } catch (qErr) {
+                console.error(`Failed to process queued offer from ${queued.sender}:`, qErr);
+            }
+        }
+
+        // --- INITIATE CONNECTIONS TO REST OF MESH ---
         await connectToRemainingParticipants(sender);
+
+        // --- START ACTIVE CALL PINGER ---
+        startActiveCallPinger('video');
 
     } catch (err) {
         console.error("=== FAILED TO ACCEPT VIDEO CALL ===");
@@ -2045,10 +2105,42 @@ function denyVideoCall() {
     }
 
     pendingVideoCallData = null;
+    pendingVideoCallQueue = []; // Clear queued offers too
     isVideoCall = false;
     cleanupWebRTC();
 
     displayMessage('System', '❌ Video call denied.', 'video-denied-' + Date.now());
+}
+
+/**
+ * Starts a periodic ping to broadcast that a call is active.
+ * This lets late joiners or returning users see the "Join Call" bar.
+ */
+function startActiveCallPinger(callType) {
+    // Clear any existing pinger
+    if (window.activeCallPinger) {
+        clearInterval(window.activeCallPinger);
+    }
+
+    // Send ping immediately
+    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+        chatSocket.send(JSON.stringify({
+            'type': 'active_call_ping',
+            'sender': fixedUsername,
+            'call_type': callType
+        }));
+    }
+
+    // Then every 10 seconds
+    window.activeCallPinger = setInterval(() => {
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            chatSocket.send(JSON.stringify({
+                'type': 'active_call_ping',
+                'sender': fixedUsername,
+                'call_type': callType
+            }));
+        }
+    }, 10000);
 }
 
 /**
