@@ -315,7 +315,7 @@ if (joinCallBtn) {
 // --- FILE UPLOAD LISTENERS ---
 if (attachmentBtn && fileInputDom) {
     // Label triggers the input click automatically via 'for="attachment-input"'
-    
+
     fileInputDom.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -441,36 +441,90 @@ if (messageInputDom) {
     });
 }
 
-async function startVoiceCall() {
-    console.log("Starting WebRTC Call...");
-    try {
-        // Initialize the connection object first (this also cleans up old connections)
-        // Must await since createPeerConnection is now async (fetches TURN credentials)
-        await createPeerConnection();
+// async function startVoiceCall() {
+//     console.log("Starting WebRTC Call...");
+//     try {
+//         // Initialize the connection object first (this also cleans up old connections)
+//         // Must await since createPeerConnection is now async (fetches TURN credentials)
+//         await createPeerConnection();
 
-        // Get microphone access and store in global for cleanup
+//         // Get microphone access and store in global for cleanup
+//         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+//         // Ensure tracks are added BEFORE createOffer
+//         localStream.getTracks().forEach(track => {
+//             peerConnection.addTrack(track, localStream);
+//         });
+
+//         const offer = await peerConnection.createOffer();
+//         await peerConnection.setLocalDescription(offer);
+
+//         // Targeted Call Logic:
+//         // If we have selected participants, we send to them specifically.
+//         // Otherwise, it's a broadcast call to 'all'.
+//         const targets = selectedCallParticipants.size > 0 ? Array.from(selectedCallParticipants) : 'all';
+
+//         chatSocket.send(JSON.stringify({
+//             'type': 'webrtc_signal',
+//             'data': offer,
+//             'target_users': targets // Send either 'all' or an array of usernames
+//         }));
+
+//         console.log(`Call offer sent successfully! Targets: ${targets}`);
+
+//         // Clear selection after starting call
+//         selectedCallParticipants.clear();
+//         if (typeof updateUserListDisplay === 'function' && window.availableParticipants) {
+//             updateUserListDisplay(window.availableParticipants);
+//         }
+
+//         showCallInterface();
+
+//         // Start pinger so other users see the "Join Call" bar
+//         startActiveCallPinger('voice');
+//     } catch (err) {
+//         console.error("Could not start voice call:", err);
+//         Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');
+//     }
+// }
+
+async function startVoiceCall() {
+    console.log("Starting WebRTC Group Voice Call...");
+    try {
+        isVideoCall = false;
+
+        // Get microphone access
+        console.log("Step 1: Requesting microphone access...");
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        // Ensure tracks are added BEFORE createOffer
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-        });
+        // Determine targets: Selected participants or everyone else in the room
+        const targets = selectedCallParticipants.size > 0
+            ? Array.from(selectedCallParticipants)
+            : window.availableParticipants
+                ? window.availableParticipants.filter(u => u !== fixedUsername)
+                : [];
 
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
+        console.log("Voice call targets:", targets);
 
-        // Targeted Call Logic:
-        // If we have selected participants, we send to them specifically.
-        // Otherwise, it's a broadcast call to 'all'.
-        const targets = selectedCallParticipants.size > 0 ? Array.from(selectedCallParticipants) : 'all';
+        // For each target participant, create a peer connection and send offer
+        for (const targetUser of targets) {
+            console.log(`Creating voice call connection for: ${targetUser}`);
 
-        chatSocket.send(JSON.stringify({
-            'type': 'webrtc_signal',
-            'data': offer,
-            'target_users': targets // Send either 'all' or an array of usernames
-        }));
+            // Create peer connection for this participant
+            const pc = await createPeerConnectionForUser(targetUser);
 
-        console.log(`Call offer sent successfully! Targets: ${targets}`);
+            // Create and send offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            chatSocket.send(JSON.stringify({
+                'type': 'webrtc_signal',
+                'data': offer,
+                'target_users': [targetUser]
+            }));
+
+            console.log(`Sent voice call offer to ${targetUser}`);
+        }
 
         // Clear selection after starting call
         selectedCallParticipants.clear();
@@ -478,13 +532,24 @@ async function startVoiceCall() {
             updateUserListDisplay(window.availableParticipants);
         }
 
+        // Show call interface
         showCallInterface();
+        
+        // Update overlay with target names
+        const participantName = document.getElementById('call-participant-name');
+        if (participantName) {
+            participantName.textContent = targets.length > 0 ? "Calling: " + targets.join(", ") : "Waiting for others...";
+        }
+
+        displayMessage('System', '🎙️ Starting group voice call...', 'voip-start-' + Date.now());
 
         // Start pinger so other users see the "Join Call" bar
         startActiveCallPinger('voice');
+
     } catch (err) {
         console.error("Could not start voice call:", err);
-        Swal.fire('Call Error', 'Failed to start call. Please check microphone access.', 'error');
+        if (typeof cleanupWebRTC === 'function') cleanupWebRTC();
+        Swal.fire('Call Error', 'Failed to start voice call: ' + err.message, 'error');
     }
 }
 

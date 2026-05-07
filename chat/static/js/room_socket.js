@@ -133,6 +133,14 @@ function cleanupWebRTC(keepQueue = false) {
         remoteAudio.remove();
     }
 
+    // 4b. Remove all dynamic per-peer audio elements
+    const dynamicAudios = document.querySelectorAll('audio[id^="remote-audio-"]');
+    dynamicAudios.forEach(audio => {
+        audio.pause();
+        audio.srcObject = null;
+        audio.remove();
+    });
+
     // 5. Clear local video element
     const localVideo = document.getElementById('local-video');
     if (localVideo) {
@@ -802,6 +810,23 @@ async function createPeerConnectionForUser(peerId) {
                 videoElement.srcObject = event.streams[0];
                 videoElement.play().catch(e => console.warn(`Video play blocked for ${peerId}:`, e));
             }
+        } else if (event.track.kind === 'audio' && !isVideoCall) {
+            // Voice-only call - create a hidden audio element for this peer
+            console.log(`Processing audio track for voice call from ${peerId}...`);
+            let remoteAudio = document.getElementById(`remote-audio-${peerId}`);
+            if (remoteAudio) {
+                remoteAudio.srcObject = null;
+                remoteAudio.remove();
+            }
+            remoteAudio = document.createElement('audio');
+            remoteAudio.id = `remote-audio-${peerId}`;
+            remoteAudio.autoplay = true;
+            remoteAudio.playsInline = true;
+            remoteAudio.srcObject = event.streams[0];
+            document.body.appendChild(remoteAudio);
+            
+            // Update the voice call overlay participant list
+            updateVoiceCallParticipantList();
         }
     };
 
@@ -1075,9 +1100,9 @@ async function createPeerConnection(preserveCandidates = false) {
             }
         }
     };
+
+    return peerConnection;
 }
-
-
 
 
 function connectWebSocket() {
@@ -1394,22 +1419,22 @@ function handleSocketMessage(e) {
                     if (messageInputDom) messageInputDom.disabled = false;
                     if (submitButtonDom) submitButtonDom.disabled = false;
 
-                // --- CRITICAL FIX: CLEAN URL TO PREVENT "PENDING LOOP" ON RELOAD/RECONNECT ---
-                // This ensures that if the browser refreshes or reconnects (e.g. after backgrounding),
-                // the user is treated as an ACTIVE user (no request param) instead of a PENDING one.
-                try {
-                    const url = new URL(window.location);
-                    if (url.searchParams.has('request')) {
-                        url.searchParams.delete('request');
-                        window.history.replaceState({}, '', url);
-                        console.log("URL Cleaned: Removed 'request' parameter. User is now permanently active.");
+                    // --- CRITICAL FIX: CLEAN URL TO PREVENT "PENDING LOOP" ON RELOAD/RECONNECT ---
+                    // This ensures that if the browser refreshes or reconnects (e.g. after backgrounding),
+                    // the user is treated as an ACTIVE user (no request param) instead of a PENDING one.
+                    try {
+                        const url = new URL(window.location);
+                        if (url.searchParams.has('request')) {
+                            url.searchParams.delete('request');
+                            window.history.replaceState({}, '', url);
+                            console.log("URL Cleaned: Removed 'request' parameter. User is now permanently active.");
+                        }
+                    } catch (e) {
+                        console.error("Failed to clean URL:", e);
                     }
-                } catch (e) {
-                    console.error("Failed to clean URL:", e);
                 }
             }
-        }
-        break;
+            break;
 
         case 'error':
             if (isAwaitingServerSync && data.message.includes('Access denied')) {
@@ -1505,13 +1530,13 @@ function handleSocketMessage(e) {
             if (isOwner && requestCountSpan) {
                 requestCountSpan.textContent = data.count;
                 updateBellIconColor(data.count);
-                
+
                 // Always clear and rebuild to ensure accuracy
                 if (pendingRequestsContainer && Array.isArray(data.requesters)) {
                     pendingRequestsContainer.innerHTML = '';
                     data.requesters.forEach(requester => displayRequestCard(requester, false));
                 }
-                
+
                 updateRequestPanelContent();
             }
             break;
@@ -1565,7 +1590,7 @@ function handleSocketMessage(e) {
 
         case 'active_call_ping':
             // If I am already in a call, ignore
-            if (peerConnection || isVideoCall) return;
+            if (peerConnections.size > 0) return;
 
             // Show Join Bar
             const joinBar = document.getElementById('join-call-bar');
@@ -1594,23 +1619,25 @@ function handleSocketMessage(e) {
             console.log(`User ${data.sender} left the call.`);
             displayMessage('System', `📞 ${data.sender} left the call.`, 'call-left-' + Date.now());
 
-            if (isVideoCall) {
+            if (isVideoCall || peerConnections.size > 0) {
                 // Remove their video tile and peer connection
                 if (typeof removeVideoTile === 'function') {
                     removeVideoTile(data.sender);
                 }
 
-                // Check if we are the last person remaining (only local tile left)
+                // Check if we are the last person remaining
                 const videoGrid = document.getElementById('video-grid');
                 const remoteTiles = videoGrid ? videoGrid.querySelectorAll('.video-tile:not(.local-tile)') : [];
+                
+                // If it was a voice call, update the participant list
+                if (!isVideoCall) {
+                    updateVoiceCallParticipantList();
+                }
+
                 if (remoteTiles.length === 0 && peerConnections.size === 0) {
                     displayMessage('System', '📞 Everyone left the call. Call ended.', 'call-ended-' + Date.now());
                     cleanupWebRTC();
                 }
-            } else if (peerConnection) {
-                // Voice call — the other person left, end the call
-                displayMessage('System', '📞 Call ended.', 'call-ended-' + Date.now());
-                cleanupWebRTC();
             }
             break;
 
@@ -1636,7 +1663,7 @@ function handleSocketMessage(e) {
         case 'session_status':
             if (data.status === 'pending') {
                 console.log("Session Status: Pending (Reason: " + data.reason + ")");
-                
+
                 // Force UI into pending state
                 isPendingUser = true;
                 if (approvalOverlay) approvalOverlay.classList.remove('hidden');
@@ -1700,10 +1727,10 @@ function handleSocketMessage(e) {
                 handleIncomingCall(data.data, sender);
             }
             else if (data.data.type === 'answer') {
-                // Check if this is a group video call (using peerConnections Map)
-                if (isVideoCall && peerConnections.has(sender)) {
+                // Handle answer using peerConnections Map
+                if (peerConnections.has(sender)) {
                     const pc = peerConnections.get(sender);
-                    if (pc && pc.signalingState === "have-local-offer") {
+                    if (pc && (pc.signalingState === "have-local-offer" || pc.signalingState === "stable")) {
                         pc.setRemoteDescription(new RTCSessionDescription(data.data))
                             .then(() => {
                                 console.log(`Remote description set for ${sender}. Processing queued ICE candidates...`);
@@ -1720,36 +1747,10 @@ function handleSocketMessage(e) {
                             .catch(err => console.error(`Error setting remote answer from ${sender}:`, err));
                     }
                 }
-                // Fallback for voice calls (single peer connection)
-                else if (peerConnection && peerConnection.signalingState === "have-local-offer") {
-                    peerConnection.setRemoteDescription(new RTCSessionDescription(data.data))
-                        .then(() => {
-                            console.log("Remote description set (answer). Processing queued ICE candidates...");
-
-                            // Process any queued ICE candidates
-                            const processQueue = () => {
-                                if (iceCandidateQueue.length > 0) {
-                                    const candidate = iceCandidateQueue.shift();
-                                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
-                                        .then(() => {
-                                            console.log("Added queued ICE candidate");
-                                            processQueue(); // Process next
-                                        })
-                                        .catch(err => {
-                                            console.error("Error adding queued ICE candidate:", err);
-                                            processQueue(); // Continue even on error
-                                        });
-                                }
-                            };
-                            processQueue();
-                        })
-                        .catch(err => console.error("Error setting remote answer:", err));
-                }
             }
             else if (data.data.ice) {
-                // Handle ICE candidate
-                // For group video calls, use the Map
-                if (isVideoCall && peerConnections.has(sender)) {
+                // Handle ICE candidate using peerConnections Map
+                if (peerConnections.has(sender)) {
                     const pc = peerConnections.get(sender);
                     if (pc && pc.remoteDescription) {
                         pc.addIceCandidate(new RTCIceCandidate(data.data.ice))
@@ -1763,22 +1764,13 @@ function handleSocketMessage(e) {
                         iceCandidateQueues.get(sender).push(data.data.ice);
                         console.log(`Queued ICE candidate for ${sender}`);
                     }
-                }
-                // Fallback for voice calls or when peer connection exists in traditional mode
-                else if (peerConnection && peerConnection.remoteDescription) {
-                    peerConnection.addIceCandidate(new RTCIceCandidate(data.data.ice))
-                        .then(() => console.log("Added ICE candidate successfully"))
-                        .catch(err => console.error("Error adding ICE candidate:", err));
                 } else {
-                    // Queue for later (traditional mode)
-                    console.log("Queueing ICE candidate (peer connection or remote description not ready)");
-                    iceCandidateQueue.push(data.data.ice);
-
-                    // Also queue per-sender for group calls
+                    // Queue for later if connection not yet established
                     if (!iceCandidateQueues.has(sender)) {
                         iceCandidateQueues.set(sender, []);
                     }
                     iceCandidateQueues.get(sender).push(data.data.ice);
+                    console.log(`Queued ICE candidate for unknown sender ${sender}`);
                 }
             }
 
@@ -1861,11 +1853,28 @@ async function handleIncomingCall(offer, sender) {
 
         // Update UI and participant info
         const participantName = document.getElementById('call-participant-name');
-        if (participantName) participantName.textContent = sender;
+        if (participantName) {
+            participantName.textContent = `Incoming call from ${sender}`;
+        }
 
         // Show voice call overlay in "Incoming" mode
         showCallInterface(true);
         displayMessage('System', `📞 Incoming call from ${sender}...`, 'voip-incoming-' + Date.now());
+    }
+}
+
+/**
+ * Updates the participant list displayed in the voice call overlay
+ */
+function updateVoiceCallParticipantList() {
+    const participantName = document.getElementById('call-participant-name');
+    if (!participantName) return;
+
+    const participants = Array.from(peerConnections.keys());
+    if (participants.length === 0) {
+        participantName.textContent = "Waiting for others...";
+    } else {
+        participantName.textContent = "With: " + participants.join(", ");
     }
 }
 
@@ -1884,43 +1893,41 @@ async function acceptCall() {
     }
 
     try {
-        console.log("Accepting call from:", sender);
+        console.log("Accepting voice call from:", sender);
+        isVideoCall = false;
 
         // Switch UI to "Ongoing" mode
         showCallInterface(false);
 
-        // Initialize the connection object - PRESERVE the candidates we received while the overlay was visible!
-        console.log("Step 1: Creating peer connection (preserving queued candidates)...");
-        await createPeerConnection(true);
-
         // Get microphone access
-        console.log("Step 2: Requesting microphone access...");
+        console.log("Step 1: Requesting microphone access...");
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-            console.log("Step 2: Added track to peer connection:", track.kind);
-        });
+        // Create peer connection for this specific caller
+        console.log("Step 2: Creating peer connection for caller...");
+        const pc = await createPeerConnectionForUser(sender);
 
+        // Set remote description (their offer)
         console.log("Step 3: Setting remote description (offer)...");
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-        // Process any queued ICE candidates
-        console.log("Step 3.5: Processing", iceCandidateQueue.length, "queued ICE candidates...");
-        while (iceCandidateQueue.length > 0) {
-            const candidate = iceCandidateQueue.shift();
+        // Process any queued ICE candidates for this peer
+        const queue = iceCandidateQueues.get(sender) || [];
+        console.log(`Step 3.5: Processing ${queue.length} queued ICE candidates for ${sender}...`);
+        while (queue.length > 0) {
+            const candidate = queue.shift();
             try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
             } catch (err) {
                 console.error("Error adding queued ICE candidate:", err);
             }
         }
 
         console.log("Step 4: Creating answer...");
-        const answer = await peerConnection.createAnswer();
+        const answer = await pc.createAnswer();
 
         console.log("Step 5: Setting local description (answer)...");
-        await peerConnection.setLocalDescription(answer);
+        await pc.setLocalDescription(answer);
 
         console.log("Step 6: Sending answer to", sender);
         chatSocket.send(JSON.stringify({
@@ -1929,14 +1936,20 @@ async function acceptCall() {
             'target_users': [sender]
         }));
 
-        console.log("=== CALL ACCEPTED AND CONNECTED ===");
-        displayMessage('System', '📱 Call connected.', 'voip-answering-' + Date.now());
+        console.log("=== VOICE CALL ACCEPTED AND CONNECTED ===");
+        displayMessage('System', '📱 Voice call connected.', 'voip-answering-' + Date.now());
+
+        // --- INITIATE CONNECTIONS TO REST OF MESH ---
+        await connectToRemainingParticipants(sender);
+
+        // --- START ACTIVE CALL PINGER ---
+        startActiveCallPinger('voice');
 
     } catch (err) {
-        console.error("=== FAILED TO ACCEPT CALL ===");
+        console.error("=== FAILED TO ACCEPT VOICE CALL ===");
         console.error(err);
         cleanupWebRTC();
-        displayMessage('System', '❌ Failed to connect call: ' + err.message, 'voip-error-' + Date.now());
+        displayMessage('System', '❌ Failed to connect voice call: ' + err.message, 'voip-error-' + Date.now());
     }
 }
 
@@ -2062,7 +2075,7 @@ async function acceptVideoCall() {
                 // Process queued ICE candidates for this peer
                 const qQueue = iceCandidateQueues.get(queued.sender) || [];
                 while (qQueue.length > 0) {
-                    try { await qpc.addIceCandidate(new RTCIceCandidate(qQueue.shift())); } catch(e) {}
+                    try { await qpc.addIceCandidate(new RTCIceCandidate(qQueue.shift())); } catch (e) { }
                 }
 
                 const qAnswer = await qpc.createAnswer();
@@ -2169,8 +2182,10 @@ async function connectToRemainingParticipants(excludeUser) {
 
         console.log(`[Mesh] Initiating connection to: ${targetUser}`);
 
-        // Create video tile
-        createVideoTile(targetUser);
+        // Create video tile ONLY for video calls
+        if (isVideoCall) {
+            createVideoTile(targetUser);
+        }
 
         // Create peer connection
         const pc = await createPeerConnectionForUser(targetUser);
