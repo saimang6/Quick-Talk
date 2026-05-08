@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  html, body {
+
+  html,
+  body {
     @apply h-full m-0 p-0 text-white bg-slate-950;
     font-family: 'Inter', sans-serif;
     overscroll-behavior-y: contain;
@@ -12,11 +14,13 @@
 }
 
 @layer components {
+
   /* Scrollbar hiding utilities */
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -73,6 +77,7 @@
     .user-list-drawer {
       @apply fixed top-0 right-0 h-full z-[1000] translate-x-full shadow-2xl;
     }
+
     .mention-suggestions {
       @apply left-2.5 right-2.5 bottom-[70px] max-w-none w-auto;
     }
@@ -184,6 +189,18 @@
     @apply bg-slate-800;
   }
 
+  .action-btn {
+    @apply w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all text-xs;
+  }
+
+  .message-footer {
+    @apply flex items-center justify-between gap-3 mt-1 pt-1 border-t border-white/5;
+  }
+
+  .message-selected .message-bubble {
+    @apply ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-950;
+  }
+
   .mention-avatar {
     @apply w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs text-white font-bold shrink-0;
   }
@@ -200,8 +217,18 @@
 
 /* Custom Animations */
 @keyframes dot-pulse {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1.0); opacity: 1; }
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+
+  40% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
 }
 
 .mobile-alert-responsive-container {

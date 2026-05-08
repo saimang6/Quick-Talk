@@ -100,7 +100,7 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
 
     const messageBubble = document.createElement('div');
     messageBubble.classList.add(isSystemMessage ? 'system-message-bubble' : 'message-bubble');
-    
+
     if (isSystemMessage) {
         // Use class 'system-message-bubble' from CSS
     } else {
@@ -207,64 +207,65 @@ function displayMessage(sender, message, messageId, timestamp = null, suppressSc
     messageBubble.appendChild(content);
 
 
+    // --- MESSAGE FOOTER (Reactions + Timestamp) ---
     if (!isSystemMessage) {
+        // --- MESSAGE FOOTER (Reactions + Timestamp) ---
+        const messageFooter = document.createElement('div');
+        messageFooter.classList.add('message-footer');
+        messageFooter.style.display = 'flex';
+        messageFooter.style.alignItems = 'center';
+        messageFooter.style.justifyContent = 'space-between';
+        messageFooter.style.gap = '10px';
+        messageFooter.style.marginTop = '4px';
+
+        const reactionContainer = document.createElement('div');
+        reactionContainer.id = `reactions-${messageId}`;
+        reactionContainer.classList.add('reaction-container');
+        reactionContainer.style.marginTop = '0'; // Reset margin for footer layout
+
         const timeSpan = document.createElement('span');
         timeSpan.classList.add('message-timestamp');
-        // FIX CONFIRMED: Using the actual timestamp variable passed to the function
         timeSpan.textContent = formatTimestamp(timestamp);
+        timeSpan.style.marginTop = '0'; // Reset margin for footer layout
 
-        // --- ADD REACTION BUTTON ---
-        const reactBtn = document.createElement('span');
-        reactBtn.classList.add('add-reaction-btn');
-        reactBtn.innerHTML = '<i class="far fa-smile"></i>'; // FontAwesome icon
-        reactBtn.title = "Add Reaction";
-        reactBtn.style.alignSelf = 'center';
-        reactBtn.style.margin = '0 8px';
+        messageFooter.appendChild(reactionContainer);
+        messageFooter.appendChild(timeSpan);
+        messageBubble.appendChild(messageFooter);
+
+        // --- ACTIONS CONTAINER ---
+        const actionsContainer = document.createElement('div');
+        actionsContainer.classList.add('message-actions');
+        actionsContainer.style.display = 'flex';
+        actionsContainer.style.flexDirection = 'column';
+        actionsContainer.style.justifyContent = 'center';
+        actionsContainer.style.paddingLeft = '10px';
+
+        const reactBtn = document.createElement('button');
+        reactBtn.classList.add('action-btn', 'add-reaction-btn');
+        reactBtn.innerHTML = '<i class="far fa-smile"></i>';
         reactBtn.onclick = (e) => {
             e.stopPropagation();
             toggleReactionPicker(messageId, messageBubble);
         };
 
-        // --- ADD REPLY BUTTON ---
-        const replyBtn = document.createElement('span');
-        replyBtn.classList.add('reply-btn');
-        replyBtn.innerHTML = '<i class="fas fa-reply"></i>'; // FontAwesome icon
-        replyBtn.title = "Reply";
-        replyBtn.style.alignSelf = 'center';
+        const replyBtn = document.createElement('button');
+        replyBtn.classList.add('action-btn', 'reply-btn');
+        replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
         replyBtn.onclick = (e) => {
             e.stopPropagation();
             startReply(messageId, sender, message);
         };
 
-        // Append Reaction button next to timestamp
-        messageBubble.appendChild(timeSpan);
+        actionsContainer.appendChild(reactBtn);
+        actionsContainer.appendChild(replyBtn);
 
-        // Append elements to wrapper based on side
-        // If Me: Button First (Left of Bubble)
-        if (isMe) {
-            messageWrapper.appendChild(replyBtn); // Reply Button far left
-            messageWrapper.appendChild(reactBtn); // React Button
-            messageWrapper.appendChild(messageBubble);
-        } else {
-            // If Other: Bubble First, then Button (Right of Bubble)
-            messageWrapper.appendChild(messageBubble);
-            messageWrapper.appendChild(reactBtn); // React Button
-            messageWrapper.appendChild(replyBtn); // Reply Button far right (or swap order if desired)
-        }
-    } else {
-        // System message just appends bubble
         messageWrapper.appendChild(messageBubble);
-    }
+        messageWrapper.appendChild(actionsContainer);
 
-    // --- REACTION CONTAINER ---
-    if (!isSystemMessage) {
-        const reactionContainer = document.createElement('div');
-        reactionContainer.id = `reactions-${messageId}`;
-        reactionContainer.classList.add('reaction-container');
-        messageBubble.appendChild(reactionContainer);
-
-        // Initial Render
+        // Initial Render of reactions
         updateMessageReactions(messageId, reactions);
+    } else {
+        messageWrapper.appendChild(messageBubble);
     }
 
     chatLogDom.appendChild(messageWrapper);
@@ -475,8 +476,8 @@ function displayRequestCard(requester, updateCount = true) {
     requestWrapper.id = requestId;
     // Premium, compact list item design
     requestWrapper.classList.add(
-        'flex', 'items-center', 'justify-between', 'p-3', 'mb-2', 
-        'bg-slate-800/40', 'hover:bg-slate-800/80', 'border', 'border-slate-700/50', 
+        'flex', 'items-center', 'justify-between', 'p-3', 'mb-2',
+        'bg-slate-800/40', 'hover:bg-slate-800/80', 'border', 'border-slate-700/50',
         'rounded-2xl', 'transition-colors', 'animate-fadeIn'
     );
 
@@ -486,14 +487,14 @@ function displayRequestCard(requester, updateCount = true) {
 
     const avatar = document.createElement('div');
     avatar.classList.add(
-        'flex-shrink-0', 'w-10', 'h-10', 'bg-gradient-to-br', 'from-amber-400', 'to-orange-500', 
+        'flex-shrink-0', 'w-10', 'h-10', 'bg-gradient-to-br', 'from-amber-400', 'to-orange-500',
         'rounded-full', 'flex', 'items-center', 'justify-center', 'text-white', 'font-bold', 'shadow-inner'
     );
     avatar.textContent = requester.charAt(0).toUpperCase();
 
     const textDiv = document.createElement('div');
     textDiv.classList.add('flex', 'flex-col', 'truncate');
-    
+
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('text-slate-200', 'font-semibold', 'truncate');
     nameSpan.textContent = requester;
@@ -520,9 +521,9 @@ function displayRequestCard(requester, updateCount = true) {
     acceptBtn.style.borderRadius = '12px';
     acceptBtn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
     acceptBtn.classList.add(
-        'flex', 'items-center', 'justify-center', 
-        'text-emerald-500', 'hover:bg-emerald-500', 'hover:text-white', 
-        'hover:-translate-y-0.5', 'hover:shadow-lg', 
+        'flex', 'items-center', 'justify-center',
+        'text-emerald-500', 'hover:bg-emerald-500', 'hover:text-white',
+        'hover:-translate-y-0.5', 'hover:shadow-lg',
         'transition-all', 'duration-200'
     );
     acceptBtn.onclick = () => sendApprovalDecision('accept', requester);
@@ -535,8 +536,8 @@ function displayRequestCard(requester, updateCount = true) {
     denyBtn.style.borderRadius = '12px';
     denyBtn.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
     denyBtn.classList.add(
-        'flex', 'items-center', 'justify-center', 
-        'text-rose-500', 'hover:bg-rose-500', 'hover:text-white', 
+        'flex', 'items-center', 'justify-center',
+        'text-rose-500', 'hover:bg-rose-500', 'hover:text-white',
         'hover:-translate-y-0.5', 'hover:shadow-lg',
         'transition-all', 'duration-200'
     );
@@ -576,7 +577,7 @@ function confirmAndLeave() {
     };
 
     const title = 'Leave Chat Room?';
-    const htmlText = isOwner 
+    const htmlText = isOwner
         ? 'You are about to leave the room. The room will remain active unless you delete it from the lobby.'
         : 'You will be disconnected from the chat and won\'t see previous messages when you rejoin.';
 
@@ -597,7 +598,7 @@ function confirmAndLeave() {
     });
 }
 
-window.cancelJoinAndLeave = function() {
+window.cancelJoinAndLeave = function () {
     console.log("cancelJoinAndLeave called");
     Swal.fire({
         title: 'Return to Lobby?',
@@ -623,7 +624,7 @@ window.cancelJoinAndLeave = function() {
             if (typeof disableExitPrevention === 'function') {
                 disableExitPrevention();
             }
-            
+
             // Send explicit leave signal to the server so the request is removed
             if (typeof chatSocket !== 'undefined' && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
                 chatSocket.send(JSON.stringify({ 'type': 'explicit_leave', 'sender': fixedUsername }));
@@ -773,6 +774,9 @@ function cancelReply() {
     if (typeof drawerBackdrop !== 'undefined' && drawerBackdrop) {
         drawerBackdrop.addEventListener('click', toggleUserList);
     }
+    if (typeof closeUserListBtn !== 'undefined' && closeUserListBtn) {
+        closeUserListBtn.addEventListener('click', toggleUserList);
+    }
 })();
 
 // --- EMOJI PICKER LOGIC ---
@@ -790,7 +794,7 @@ if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPicke
         }
 
         emojiPickerPopover.classList.toggle('hidden');
-        
+
         // Position the picker above the button
         const rect = emojiToggleBtn.getBoundingClientRect();
         emojiPickerPopover.style.bottom = `${window.innerHeight - rect.top + 10}px`;
@@ -810,7 +814,7 @@ if (typeof emojiToggleBtn !== 'undefined' && emojiToggleBtn && typeof emojiPicke
                 const value = messageInputDom.value;
 
                 messageInputDom.value = value.substring(0, start) + emoji + value.substring(end);
-                
+
                 // Move cursor to after the inserted emoji
                 const newPos = start + emoji.length;
                 messageInputDom.setSelectionRange(newPos, newPos);
@@ -943,3 +947,19 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollBtn.classList.remove('show');
     });
 });
+// --- MOBILE PLACEHOLDER UPDATE ---
+function updatePlaceholderForMobile() {
+    if (!messageInputDom) return;
+
+    if (window.innerWidth < 640) {
+        messageInputDom.placeholder = "Type message...";
+    } else {
+        messageInputDom.placeholder = "Type a message or @mention someone...";
+    }
+}
+
+// Initial call and resize listener
+(function initPlaceholderLogic() {
+    updatePlaceholderForMobile();
+    window.addEventListener('resize', updatePlaceholderForMobile);
+})();

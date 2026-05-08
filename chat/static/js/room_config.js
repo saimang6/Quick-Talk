@@ -27,6 +27,7 @@ var typingIndicatorDom = document.querySelector('#typing-indicator');
 // User List and Mobile Menu Elements
 var hamburgerMenuBtn = document.querySelector('#hamburger-menu-btn');
 var userListDrawer = document.querySelector('#user-list-drawer');
+var closeUserListBtn = document.querySelector('#close-user-list-btn');
 var userListContainer = document.querySelector('#user-list-container');
 var drawerBackdrop = document.querySelector('#drawer-backdrop');
 
