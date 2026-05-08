@@ -823,7 +823,10 @@ async function createPeerConnectionForUser(peerId) {
 
     // Track handler - receive remote stream
     pc.ontrack = (event) => {
-        console.log(`Received track from ${peerId}:`, event.track.kind);
+        console.log(`[WebRTC] Received track from ${peerId}:`, event.track.kind);
+        
+        // Ensure the track is enabled
+        event.track.enabled = true;
 
         const tile = document.getElementById(`video-tile-${peerId}`);
         if (tile) {
@@ -848,20 +851,39 @@ async function createPeerConnectionForUser(peerId) {
             remoteAudio.id = `remote-audio-${peerId}`;
             remoteAudio.autoplay = true;
             remoteAudio.playsInline = true;
-            remoteAudio.srcObject = event.streams[0];
+            
+            // Robust stream attachment
+            if (event.streams && event.streams[0]) {
+                remoteAudio.srcObject = event.streams[0];
+            } else {
+                console.log(`No stream found for ${peerId}, creating new MediaStream from track.`);
+                remoteAudio.srcObject = new MediaStream([event.track]);
+            }
+            
             document.body.appendChild(remoteAudio);
+            
+            // Explicitly call play() to override aggressive mobile browser blocks
+            remoteAudio.play().then(() => {
+                console.log(`Audio playback started for ${peerId}`);
+            }).catch(e => {
+                console.warn(`Audio playback failed for ${peerId}:`, e);
+                // On some mobiles, we need a second try after a short delay
+                setTimeout(() => remoteAudio.play().catch(() => {}), 1000);
+            });
 
             // Update the voice call overlay participant list
             updateVoiceCallParticipantList();
         }
     };
 
-    // Add local tracks if available
+    // Add local tracks
     if (localStream) {
         localStream.getTracks().forEach(track => {
+            console.log(`[WebRTC] Adding local ${track.kind} track to ${peerId}`);
             pc.addTrack(track, localStream);
-            console.log(`Added ${track.kind} track to connection for ${peerId}`);
         });
+    } else {
+        console.log(`[WebRTC] No local stream yet for ${peerId}.`);
     }
 
     return pc;
@@ -1888,7 +1910,10 @@ async function handleIncomingCall(offer, sender) {
         }
 
         // Create and send answer
-        const answer = await pc.createAnswer();
+        const answer = await pc.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: isVideoCall
+        });
         await pc.setLocalDescription(answer);
 
         chatSocket.send(JSON.stringify({
@@ -2152,7 +2177,10 @@ async function acceptVideoCall() {
                     try { await qpc.addIceCandidate(new RTCIceCandidate(qQueue.shift())); } catch (e) { }
                 }
 
-                const qAnswer = await qpc.createAnswer();
+                const qAnswer = await qpc.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: isVideoCall
+                });
                 await qpc.setLocalDescription(qAnswer);
                 chatSocket.send(JSON.stringify({
                     'type': 'webrtc_signal',
@@ -2264,8 +2292,11 @@ async function connectToRemainingParticipants(excludeUser) {
         // Create peer connection
         const pc = await createPeerConnectionForUser(targetUser);
 
-        // Create and send offer
-        const offer = await pc.createOffer();
+        // Create and send offer with explicit receive constraints (crucial for mobile)
+        const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: isVideoCall
+        });
         await pc.setLocalDescription(offer);
 
         chatSocket.send(JSON.stringify({

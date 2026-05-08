@@ -513,8 +513,11 @@ async function startVoiceCall() {
             // Create peer connection for this participant
             const pc = await createPeerConnectionForUser(targetUser);
 
-            // Create and send offer
-            const offer = await pc.createOffer();
+            // Create and send offer with explicit receive constraints
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: isVideoCall
+            });
             await pc.setLocalDescription(offer);
 
             chatSocket.send(JSON.stringify({
