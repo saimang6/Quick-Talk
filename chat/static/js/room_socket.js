@@ -75,10 +75,11 @@ let videoCallParticipants = new Set(); // Track active video call participants
 
 /**
  * Cleans up WebRTC resources (peer connection, audio/video elements, streams)
- * @param {boolean} keepQueue - If true, preserves the iceCandidateQueue (used during call setup phase)
+ * @param {boolean} keepQueue - If true, preserves the iceCandidateQueue
+ * @param {boolean} suppressSignal - If true, does not send the leave_call signal to the server
  */
-function cleanupWebRTC(keepQueue = false) {
-    console.log("Cleaning up WebRTC resources... (keepQueue: " + keepQueue + ")");
+function cleanupWebRTC(keepQueue = false, suppressSignal = false) {
+    console.log("Cleaning up WebRTC resources... (keepQueue: " + keepQueue + ", suppressSignal: " + suppressSignal + ")");
 
     // 1. Stop all local audio/video tracks
     if (localStream) {
@@ -112,7 +113,7 @@ function cleanupWebRTC(keepQueue = false) {
     pendingVideoCallQueue = [];
 
     // --- NEW: Send Leave Call Signal ---
-    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+    if (!suppressSignal && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
         chatSocket.send(JSON.stringify({
             'type': 'leave_call',
             'sender': fixedUsername
@@ -824,7 +825,7 @@ async function createPeerConnectionForUser(peerId) {
             remoteAudio.playsInline = true;
             remoteAudio.srcObject = event.streams[0];
             document.body.appendChild(remoteAudio);
-            
+
             // Update the voice call overlay participant list
             updateVoiceCallParticipantList();
         }
@@ -1625,20 +1626,27 @@ function handleSocketMessage(e) {
                     removeVideoTile(data.sender);
                 }
 
-                // Check if we are the last person remaining
-                const videoGrid = document.getElementById('video-grid');
-                const remoteTiles = videoGrid ? videoGrid.querySelectorAll('.video-tile:not(.local-tile)') : [];
-                
                 // If it was a voice call, update the participant list
                 if (!isVideoCall) {
                     updateVoiceCallParticipantList();
                 }
-
-                if (remoteTiles.length === 0 && peerConnections.size === 0) {
-                    displayMessage('System', '📞 Everyone left the call. Call ended.', 'call-ended-' + Date.now());
-                    cleanupWebRTC();
-                }
+                
+                // Note: The server now handles the "1 person left" logic via 'call_ended' signal.
+                // We keep this local check as a fallback or for immediate UI feedback.
             }
+            break;
+
+        case 'call_ended':
+            console.log("Call ended signal received from server.");
+            displayMessage('System', '📞 Call ended for all participants.', 'call-ended-all-' + Date.now());
+            
+            // Immediately hide the join bar for everyone
+            const jBar = document.getElementById('join-call-bar');
+            if (jBar) jBar.classList.add('hidden');
+            if (window.joinCallTimeout) clearTimeout(window.joinCallTimeout);
+            window.activeCallType = null;
+
+            cleanupWebRTC(false, true); // true = suppress leave_call signal
             break;
 
         case 'catch_up_messages':
@@ -1794,12 +1802,17 @@ async function handleIncomingCall(offer, sender) {
     const hasVideo = offer.sdp && offer.sdp.includes('m=video');
     console.log("Call type:", hasVideo ? "VIDEO" : "VOICE");
 
-    // Check if we are ALREADY in a video call - if so, add this person as a new participant
-    if (hasVideo && isVideoCall && localStream) {
-        console.log("Already in video call - adding new participant:", sender);
+    // Check if we are ALREADY in a call of the same type - if so, add this person as a new participant
+    const isAlreadyInVoiceCall = !hasVideo && !isVideoCall && localStream;
+    const isAlreadyInVideoCall = hasVideo && isVideoCall && localStream;
 
-        // Create a video tile for this new participant
-        createVideoTile(sender);
+    if (isAlreadyInVideoCall || isAlreadyInVoiceCall) {
+        console.log(`Already in ${hasVideo ? 'video' : 'voice'} call - adding new participant: ${sender}`);
+
+        if (hasVideo) {
+            // Create a video tile for this new participant
+            createVideoTile(sender);
+        }
 
         // Create peer connection for this participant
         const pc = await createPeerConnectionForUser(sender);
@@ -1828,7 +1841,12 @@ async function handleIncomingCall(offer, sender) {
             'target_users': [sender]
         }));
 
-        displayMessage('System', `📹 ${sender} joined the video call.`, 'video-join-' + Date.now());
+        displayMessage('System', `${hasVideo ? '📹' : '📞'} ${sender} joined the call.`, (hasVideo ? 'video-join-' : 'voice-join-') + Date.now());
+
+        if (!hasVideo) {
+            updateVoiceCallParticipantList();
+        }
+        
         return;
     }
 
@@ -2144,7 +2162,7 @@ function startActiveCallPinger(callType) {
         }));
     }
 
-    // Then every 10 seconds
+    // Then every 5 seconds
     window.activeCallPinger = setInterval(() => {
         if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
             chatSocket.send(JSON.stringify({
@@ -2153,7 +2171,7 @@ function startActiveCallPinger(callType) {
                 'call_type': callType
             }));
         }
-    }, 10000);
+    }, 5000);
 }
 
 /**

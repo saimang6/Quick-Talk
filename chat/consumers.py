@@ -22,6 +22,10 @@ class ChatConsumer(WebsocketConsumer):
     ROOM_REQUESTERS = {} # PENDING USERS ONLY
     # { 'room_slug': set([username1, username2]) }
     ROOM_ACTIVE_CONNECTIONS = {} # TRACKS ACTUAL OPEN SOCKETS
+    # { 'room_slug': set([username1, username2]) }
+    ROOM_CALL_PARTICIPANTS = {} # TRACKS USERS ACTIVELY IN A VOICE/VIDEO CALL
+    # { 'room_slug': 'video' or 'voice' }
+    ROOM_CALL_STATE = {} # TRACKS THE TYPE OF THE CURRENT ACTIVE CALL
     # ----------------------------------------
     
     def connect(self):
@@ -124,6 +128,7 @@ class ChatConsumer(WebsocketConsumer):
         self.ROOM_TYPERS.setdefault(self.room_slug, set())
         self.ROOM_REQUESTERS.setdefault(self.room_slug, {})
         self.ROOM_ACTIVE_CONNECTIONS.setdefault(self.room_slug, set())
+        self.ROOM_CALL_PARTICIPANTS.setdefault(self.room_slug, set())
 
         # Mark this user as ACTIVELY CONNECTED
         self.ROOM_ACTIVE_CONNECTIONS[self.room_slug].add(self.username)
@@ -303,11 +308,11 @@ class ChatConsumer(WebsocketConsumer):
             # Owners must delete rooms manually from the lobby.
             pass
 
-        # 7. Clean up typing users (always safe to run)
-        if self.room_slug in self.ROOM_TYPERS and self.username in self.ROOM_TYPERS[self.room_slug]:
-             self.ROOM_TYPERS[self.room_slug].discard(self.username)
-             self.broadcast_typing_users()
-        
+        # 8. Remove from call participants if they were in one
+        if self.room_slug in self.ROOM_CALL_PARTICIPANTS and self.username in self.ROOM_CALL_PARTICIPANTS[self.room_slug]:
+             self.ROOM_CALL_PARTICIPANTS[self.room_slug].discard(self.username)
+             self.check_and_end_call()
+
         print(f"User {self.username} disconnected (Code: {close_code}). Explicit Leave: {has_explicitly_left}")
 
 
@@ -821,6 +826,13 @@ class ChatConsumer(WebsocketConsumer):
 
         # --- NEW HANDLER: ACTIVE CALL PING ---
         elif message_type == 'active_call_ping':
+            # Add user to call participants list
+            if self.room_slug in self.ROOM_CALL_PARTICIPANTS:
+                self.ROOM_CALL_PARTICIPANTS[self.room_slug].add(self.username)
+            
+            # Store call type
+            self.ROOM_CALL_STATE[self.room_slug] = text_data_json.get('call_type', 'video')
+
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
@@ -860,10 +872,62 @@ class ChatConsumer(WebsocketConsumer):
 
     def leave_call_handler(self, event):
         """Broadcasts that a user has left the WebRTC call."""
+        # Remove user from server-side participant tracking
+        if self.room_slug in self.ROOM_CALL_PARTICIPANTS:
+            self.ROOM_CALL_PARTICIPANTS[self.room_slug].discard(event['sender'])
+        
         if self.username == event['sender']: return
+        
         self.send(text_data=json.dumps({
             'type': 'leave_call',
             'sender': event['sender']
+        }))
+        
+        # Check if call should end after someone left
+        self.check_and_end_call()
+
+    def check_and_end_call(self):
+        """Checks if the call should be terminated based on participant count."""
+        participants = self.ROOM_CALL_PARTICIPANTS.get(self.room_slug, set())
+        count = len(participants)
+        
+        # If call dropped to 0 or 1, it should end for everyone
+        if count <= 1:
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'call_ended_notification',
+                    'sender': 'System'
+                }
+            )
+            
+            if count == 0:
+                participants.clear()
+                if self.room_slug in self.ROOM_CALL_STATE:
+                    del self.ROOM_CALL_STATE[self.room_slug]
+        else:
+            # Call is still active with >= 2 people!
+            # Broadcast an immediate ping so the person who just left sees the join bar instantly.
+            call_type = self.ROOM_CALL_STATE.get(self.room_slug, 'video')
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'active_call_ping_handler',
+                    'sender': 'System',
+                    'call_type': call_type
+                }
+            )
+
+    def call_ended_notification(self, event):
+        """Broadcasts that the call has ended to everyone in the room."""
+        # Clear local participant set and state for this room on the server side
+        if self.room_slug in self.ROOM_CALL_PARTICIPANTS:
+             self.ROOM_CALL_PARTICIPANTS[self.room_slug].clear()
+        if self.room_slug in self.ROOM_CALL_STATE:
+             del self.ROOM_CALL_STATE[self.room_slug]
+
+        self.send(text_data=json.dumps({
+            'type': 'call_ended',
         }))
 
     def active_call_ping_handler(self, event):
