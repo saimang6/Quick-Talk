@@ -892,7 +892,10 @@ class ChatConsumer(WebsocketConsumer):
         count = len(participants)
         
         # If call dropped to 0 or 1, it should end for everyone
+        print(f"[CallDebug] Room: {self.room_slug}, Participants: {participants}, Count: {count}")
+        
         if count <= 1:
+            print(f"[CallDebug] Ending call in {self.room_slug} (Count: {count})")
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
@@ -902,7 +905,8 @@ class ChatConsumer(WebsocketConsumer):
             )
             
             if count == 0:
-                participants.clear()
+                if self.room_slug in self.ROOM_CALL_PARTICIPANTS:
+                    self.ROOM_CALL_PARTICIPANTS[self.room_slug].clear()
                 if self.room_slug in self.ROOM_CALL_STATE:
                     del self.ROOM_CALL_STATE[self.room_slug]
         else:

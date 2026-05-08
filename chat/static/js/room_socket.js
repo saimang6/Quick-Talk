@@ -687,9 +687,15 @@ function removeVideoTile(peerId) {
 
     // Close and remove peer connection for this user
     if (peerConnections.has(peerId)) {
-        peerConnections.get(peerId).close();
+        const pc = peerConnections.get(peerId);
+        if (pc) pc.close();
         peerConnections.delete(peerId);
     }
+    
+    // Remove audio element for voice calls
+    const audioEl = document.getElementById(`remote-audio-${peerId}`);
+    if (audioEl) audioEl.remove();
+
     iceCandidateQueues.delete(peerId);
     videoCallParticipants.delete(peerId);
 
@@ -753,6 +759,25 @@ function updateParticipantCount() {
  */
 async function createPeerConnectionForUser(peerId) {
     console.log(`Creating peer connection for: ${peerId}`);
+
+    // Clean up existing connection to this peer if it exists
+    if (peerConnections.has(peerId)) {
+        console.log(`[Mesh] Closing old connection to ${peerId} before re-creating.`);
+        const oldPc = peerConnections.get(peerId);
+        if (oldPc) {
+            oldPc.onicecandidate = null;
+            oldPc.ontrack = null;
+            oldPc.oniceconnectionstatechange = null;
+            oldPc.close();
+        }
+        peerConnections.delete(peerId);
+    }
+
+    // Clear any stale candidates/queues for this peer
+    iceCandidateQueues.delete(peerId);
+    if (!iceCandidateQueues.has(peerId)) {
+        iceCandidateQueues.set(peerId, []);
+    }
 
     // Fetch TURN credentials
     const config = await fetchTurnCredentials();
@@ -1590,8 +1615,10 @@ function handleSocketMessage(e) {
             break;
 
         case 'active_call_ping':
-            // If I am already in a call, ignore
-            if (peerConnections.size > 0) return;
+            // If I am already in a call (either with others or just waiting with local media), ignore
+            const isAnyCallUIActive = !document.getElementById('call-interface-overlay').classList.contains('hidden') || 
+                                     !document.getElementById('video-call-overlay').classList.contains('hidden');
+            if (peerConnections.size > 0 || (localStream && localStream.active) || isAnyCallUIActive) return;
 
             // Show Join Bar
             const joinBar = document.getElementById('join-call-bar');
@@ -1633,6 +1660,15 @@ function handleSocketMessage(e) {
                 
                 // Note: The server now handles the "1 person left" logic via 'call_ended' signal.
                 // We keep this local check as a fallback or for immediate UI feedback.
+                
+                // FAILSAFE: Ensure all remaining audio elements are still playing
+                // Sometimes mobile browsers throttle audio when one stream closes.
+                setTimeout(() => {
+                    document.querySelectorAll('audio[id^="remote-audio-"]').forEach(el => {
+                        console.log(`Ensuring audio for ${el.id} is playing...`);
+                        el.play().catch(e => console.warn("Audio resume failed:", e));
+                    });
+                }, 500);
             }
             break;
 
@@ -1751,6 +1787,14 @@ function handleSocketMessage(e) {
                                         .then(() => console.log(`Added queued ICE candidate for ${sender}`))
                                         .catch(err => console.error(`Error adding ICE for ${sender}:`, err));
                                 }
+
+                                // UPDATE UI IMMEDIATELY: The call is now ongoing with this person
+                                if (isVideoCall) {
+                                    updateVideoGridLayout();
+                                    updateParticipantCount();
+                                } else {
+                                    updateVoiceCallParticipantList();
+                                }
                             })
                             .catch(err => console.error(`Error setting remote answer from ${sender}:`, err));
                     }
@@ -1802,16 +1846,28 @@ async function handleIncomingCall(offer, sender) {
     const hasVideo = offer.sdp && offer.sdp.includes('m=video');
     console.log("Call type:", hasVideo ? "VIDEO" : "VOICE");
 
-    // Check if we are ALREADY in a call of the same type - if so, add this person as a new participant
-    const isAlreadyInVoiceCall = !hasVideo && !isVideoCall && localStream;
-    const isAlreadyInVideoCall = hasVideo && isVideoCall && localStream;
+    console.log(`[CallDebug] Incoming Offer from ${sender}. isVideoCall: ${isVideoCall}, localStream: ${!!localStream}, hasVideo: ${hasVideo}, activePCs: ${peerConnections.size}`);
 
-    if (isAlreadyInVideoCall || isAlreadyInVoiceCall) {
-        console.log(`Already in ${hasVideo ? 'video' : 'voice'} call - adding new participant: ${sender}`);
+    // Check if we are ALREADY in a call or have a connection to this user
+    // CRITICAL: On mobile/ngrok, we prioritize auto-accepting if any local media is active
+    const isAlreadyInVoiceCall = !hasVideo && localStream && localStream.active;
+    const isAlreadyInVideoCall = hasVideo && isVideoCall && localStream && localStream.active;
+    const hasExistingConnection = peerConnections.has(sender);
+    
+    // UI-based check: is any call overlay already visible?
+    const voiceOverlay = document.getElementById('call-interface-overlay');
+    const isVoiceUIActive = voiceOverlay && !voiceOverlay.classList.contains('hidden');
+    
+    const videoOverlay = document.getElementById('video-call-overlay');
+    const isVideoUIActive = videoOverlay && !videoOverlay.classList.contains('hidden');
 
-        if (hasVideo) {
-            // Create a video tile for this new participant
-            createVideoTile(sender);
+    if (isAlreadyInVideoCall || isAlreadyInVoiceCall || hasExistingConnection || (hasVideo ? isVideoUIActive : isVoiceUIActive)) {
+        console.log(`Auto-accepting ${hasVideo ? 'video' : 'voice'} offer from ${sender}. (Reason: MediaActive=${!!localStream}, UIActive=${hasVideo ? isVideoUIActive : isVoiceUIActive})`);
+
+        if (hasVideo && !isVideoCall) {
+            console.log("Upgrading to video call due to incoming offer.");
+            isVideoCall = true;
+            showVideoCallInterface(false);
         }
 
         // Create peer connection for this participant
