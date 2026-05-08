@@ -330,6 +330,87 @@
             padding: 0.4rem !important;
         }
     }
+    /* Premium Swal2 Styling */
+    .premium-swal-popup {
+        background-color: #0f172a !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 2rem !important;
+        padding: 2rem !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        background-image: radial-gradient(circle at top right, rgba(79, 70, 229, 0.05), transparent) !important;
+    }
+
+    .premium-swal-title {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .premium-swal-html {
+        color: #94a3b8 !important;
+        font-size: 0.875rem !important;
+        line-height: 1.625 !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .premium-swal-confirm {
+        border-radius: 0.75rem !important;
+        font-weight: 700 !important;
+        padding: 0.75rem 2rem !important;
+        transition: all 0.2s !important;
+        background-color: #e11d48 !important;
+        color: #ffffff !important;
+    }
+
+    .premium-swal-cancel {
+        border-radius: 0.75rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 2rem !important;
+        transition: all 0.2s !important;
+        background-color: #1e293b !important;
+        color: #cbd5e1 !important;
+    }
+
+    .premium-swal-actions {
+        gap: 1rem !important;
+        margin-top: 1.5rem !important;
+    }
+
+    .mobile-alert-responsive-container {
+        backdrop-filter: blur(4px) !important;
+        background-color: rgba(2, 6, 23, 0.4) !important;
+    }
+
+    @media (max-width: 640px) {
+        .premium-swal-popup {
+            border-radius: 1.25rem !important;
+            padding: 1.25rem !important;
+            width: 85% !important;
+        }
+        .premium-swal-actions {
+            flex-direction: column-reverse !important;
+            width: 100% !important;
+            gap: 0.5rem !important;
+            display: flex !important;
+            margin-top: 1rem !important;
+        }
+        .premium-swal-confirm, .premium-swal-cancel {
+            width: 100% !important;
+            margin: 0 !important;
+            padding-top: 0.6rem !important;
+            padding-bottom: 0.6rem !important;
+            font-size: 0.875rem !important;
+        }
+        .premium-swal-title {
+            font-size: 1.1rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+        .premium-swal-html {
+            font-size: 0.75rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+    }
 </style>
 {% endblock %}
 
