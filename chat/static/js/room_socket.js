@@ -4,6 +4,31 @@
 
 const debouncedSendTypingStop = debounce(sendTypingStop, 1500);
 
+/**
+ * Unlocks the browser AudioContext during a user gesture.
+ * MUST be called directly inside a button click handler (before any async ops).
+ * This pre-authorizes all future audio.play() calls for the session,
+ * which is critical when the call initiator's gesture expires before ontrack fires.
+ */
+function unlockAudioContext() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!window._sharedAudioContext) {
+            window._sharedAudioContext = new AudioCtx();
+        }
+        if (window._sharedAudioContext.state === 'suspended') {
+            window._sharedAudioContext.resume().then(() => {
+                console.log('[Audio] AudioContext unlocked — future audio.play() calls are permitted.');
+            });
+        } else {
+            console.log('[Audio] AudioContext already running.');
+        }
+    } catch (e) {
+        console.warn('[Audio] Could not unlock AudioContext:', e);
+    }
+}
+
 // Default STUN-only config (fallback)
 let iceConfig = {
     iceServers: [
@@ -134,7 +159,15 @@ function cleanupWebRTC(keepQueue = false, suppressSignal = false) {
         remoteAudio.remove();
     }
 
-    // 4b. Remove all dynamic per-peer audio elements
+    // 4b. Disconnect all Web Audio source nodes (prevents ghost audio after hangup)
+    if (window._peerAudioSources) {
+        Object.values(window._peerAudioSources).forEach(node => {
+            try { node.disconnect(); } catch (_) {}
+        });
+        window._peerAudioSources = {};
+    }
+
+    // 4c. Remove all dynamic per-peer audio elements
     const dynamicAudios = document.querySelectorAll('audio[id^="remote-audio-"]');
     dynamicAudios.forEach(audio => {
         audio.pause();
@@ -822,7 +855,7 @@ async function createPeerConnectionForUser(peerId) {
     };
 
     // Track handler - receive remote stream
-    pc.ontrack = (event) => {
+    pc.ontrack = async (event) => {
         console.log(`[WebRTC] Received track from ${peerId}:`, event.track.kind);
         
         // Ensure the track is enabled
@@ -840,8 +873,45 @@ async function createPeerConnectionForUser(peerId) {
                 videoElement.play().catch(e => console.warn(`Video play blocked for ${peerId}:`, e));
             }
         } else if (event.track.kind === 'audio' && !isVideoCall) {
-            // Voice-only call - create a hidden audio element for this peer
-            console.log(`Processing audio track for voice call from ${peerId}...`);
+            // Voice-only call — route audio from this peer.
+            console.log(`[Audio] Received audio track from ${peerId}.`);
+
+            const stream = (event.streams && event.streams[0])
+                ? event.streams[0]
+                : new MediaStream([event.track]);
+
+            // ── PRIMARY PATH: Web Audio API ──────────────────────────────────
+            // Once unlockAudioContext() is called during a user gesture, the
+            // AudioContext stays "running" forever. Routing streams through it
+            // never needs another gesture, which is why this works even when
+            // ontrack fires long after the call-initiation tap expired on mobile.
+            let routedViaWebAudio = false;
+            if (window._sharedAudioContext) {
+                try {
+                    // Disconnect any old source node for this peer
+                    if (window._peerAudioSources && window._peerAudioSources[peerId]) {
+                        try { window._peerAudioSources[peerId].disconnect(); } catch (_) {}
+                    }
+                    if (!window._peerAudioSources) window._peerAudioSources = {};
+
+                    // Resume context if it got suspended
+                    if (window._sharedAudioContext.state === 'suspended') {
+                        await window._sharedAudioContext.resume();
+                    }
+
+                    const srcNode = window._sharedAudioContext.createMediaStreamSource(stream);
+                    srcNode.connect(window._sharedAudioContext.destination);
+                    window._peerAudioSources[peerId] = srcNode;
+                    routedViaWebAudio = true;
+                    console.log(`[Audio] Routed ${peerId} via AudioContext (state: ${window._sharedAudioContext.state})`);
+                } catch (e) {
+                    console.warn(`[Audio] Web Audio routing failed for ${peerId}, falling back to <audio>:`, e);
+                }
+            }
+
+            // ── FALLBACK PATH: HTML <audio> element ──────────────────────────
+            // Always create the element so the muted-autoplay trick gives us a
+            // second chance if the AudioContext path is unavailable or fails.
             let remoteAudio = document.getElementById(`remote-audio-${peerId}`);
             if (remoteAudio) {
                 remoteAudio.srcObject = null;
@@ -849,26 +919,27 @@ async function createPeerConnectionForUser(peerId) {
             }
             remoteAudio = document.createElement('audio');
             remoteAudio.id = `remote-audio-${peerId}`;
-            remoteAudio.autoplay = true;
             remoteAudio.playsInline = true;
-            
-            // Robust stream attachment
-            if (event.streams && event.streams[0]) {
-                remoteAudio.srcObject = event.streams[0];
-            } else {
-                console.log(`No stream found for ${peerId}, creating new MediaStream from track.`);
-                remoteAudio.srcObject = new MediaStream([event.track]);
-            }
-            
+            remoteAudio.muted = true;   // muted autoplay is always allowed
+            remoteAudio.srcObject = stream;
             document.body.appendChild(remoteAudio);
-            
-            // Explicitly call play() to override aggressive mobile browser blocks
+
             remoteAudio.play().then(() => {
-                console.log(`Audio playback started for ${peerId}`);
+                // If Web Audio is already handling it, keep muted to avoid echo.
+                // Otherwise unmute so the user can actually hear.
+                if (!routedViaWebAudio) {
+                    remoteAudio.muted = false;
+                    console.log(`[Audio] HTML element playing (unmuted) for ${peerId}`);
+                } else {
+                    console.log(`[Audio] HTML element playing (muted, Web Audio is primary) for ${peerId}`);
+                }
             }).catch(e => {
-                console.warn(`Audio playback failed for ${peerId}:`, e);
-                // On some mobiles, we need a second try after a short delay
-                setTimeout(() => remoteAudio.play().catch(() => {}), 1000);
+                console.warn(`[Audio] HTML element play() failed for ${peerId}:`, e);
+                setTimeout(() => {
+                    remoteAudio.play().then(() => {
+                        if (!routedViaWebAudio) remoteAudio.muted = false;
+                    }).catch(err => console.warn(`[Audio] Retry also failed for ${peerId}:`, err));
+                }, 500);
             });
 
             // Update the voice call overlay participant list
@@ -1068,7 +1139,7 @@ async function createPeerConnection(preserveCandidates = false) {
     };
 
     // 2. Listen for the remote audio/video stream
-    peerConnection.ontrack = (event) => {
+    peerConnection.ontrack = async (event) => {
         console.log("Incoming stream detected! Track kind:", event.track.kind);
 
         if (event.track.kind === 'video') {
@@ -1107,40 +1178,63 @@ async function createPeerConnection(preserveCandidates = false) {
                     remoteVideo.srcObject = event.streams[0];
                 }
             } else {
-                // Voice-only call - use audio element
-                console.log("Processing audio-only call...");
+                // Voice-only call — dual-path audio routing
+                console.log('[Audio] Processing audio-only call (legacy handler)...');
 
-                // Remove any existing audio element first
+                const stream = (event.streams && event.streams[0])
+                    ? event.streams[0]
+                    : new MediaStream([event.track]);
+
+                // PRIMARY: Web Audio API (gesture-independent once unlocked)
+                let routedViaWebAudio = false;
+                if (window._sharedAudioContext) {
+                    try {
+                        if (window._sharedAudioContext.state === 'suspended') {
+                            await window._sharedAudioContext.resume();
+                        }
+                        const srcNode = window._sharedAudioContext.createMediaStreamSource(stream);
+                        srcNode.connect(window._sharedAudioContext.destination);
+                        routedViaWebAudio = true;
+                        console.log('[Audio] Legacy handler: routed via AudioContext.');
+                    } catch (e) {
+                        console.warn('[Audio] Legacy Web Audio routing failed, using <audio>:', e);
+                    }
+                }
+
+                // FALLBACK: HTML audio element with muted-autoplay trick
                 let remoteAudio = document.getElementById('remote-voip-audio');
                 if (remoteAudio) {
                     remoteAudio.pause();
                     remoteAudio.srcObject = null;
                     remoteAudio.remove();
                 }
-
-                // Create a fresh audio element
                 remoteAudio = document.createElement('audio');
                 remoteAudio.id = 'remote-voip-audio';
+                remoteAudio.setAttribute('playsinline', 'true');
+                remoteAudio.volume = 1.0;
+                remoteAudio.muted = true;
+                remoteAudio.srcObject = stream;
                 document.body.appendChild(remoteAudio);
 
-                // Set attributes for mobile compatibility
-                remoteAudio.setAttribute('autoplay', 'true');
-                remoteAudio.setAttribute('playsinline', 'true');
-                remoteAudio.volume = 1.0; // Max volume
-                remoteAudio.srcObject = event.streams[0];
-
-                // CRITICAL: Manually trigger play to bypass browser silence policies
                 remoteAudio.play().then(() => {
-                    console.log("Remote audio playing successfully!");
+                    if (!routedViaWebAudio) {
+                        remoteAudio.muted = false;
+                        console.log('[Audio] Legacy HTML element playing (unmuted).');
+                    }
                 }).catch(e => {
-                    console.warn("Autoplay blocked. User must click the page to hear audio.", e);
-                    displayMessage('System', '🔊 Click anywhere to enable call audio.', Date.now());
-
-                    // Add a one-time click listener to resume audio
-                    document.addEventListener('click', function resumeAudio() {
-                        remoteAudio.play();
-                        document.removeEventListener('click', resumeAudio);
-                    }, { once: true });
+                    console.warn('[Audio] Legacy HTML play() failed:', e);
+                    setTimeout(() => {
+                        remoteAudio.play().then(() => {
+                            if (!routedViaWebAudio) remoteAudio.muted = false;
+                        }).catch(() => {
+                            displayMessage('System', '🔊 Tap anywhere to enable call audio.', Date.now());
+                            document.addEventListener('click', function resumeAudio() {
+                                remoteAudio.muted = false;
+                                remoteAudio.play().catch(() => {});
+                                document.removeEventListener('click', resumeAudio);
+                            }, { once: true });
+                        });
+                    }, 500);
                 });
 
                 displayMessage('System', '🎙️ Voice call active.', 'voip-active-' + Date.now());
@@ -1986,6 +2080,10 @@ async function acceptCall() {
     const { offer, sender } = pendingCallData;
     pendingCallData = null; // Clear pending data
 
+    // Unlock AudioContext immediately in this gesture context
+    // so that audio.play() will succeed when ontrack fires asynchronously.
+    unlockAudioContext();
+
     // Stop ringtone when call is accepted
     if (window.ringtoneManager) {
         window.ringtoneManager.stop();
@@ -2078,6 +2176,9 @@ async function acceptVideoCall() {
     if (!pendingVideoCallData) return;
     const { offer, sender } = pendingVideoCallData;
     pendingVideoCallData = null;
+
+    // Unlock AudioContext immediately in this gesture context
+    unlockAudioContext();
 
     // Stop ringtone when video call is accepted
     if (window.ringtoneManager) {

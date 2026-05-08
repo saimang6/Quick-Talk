@@ -96,32 +96,45 @@ try {
 const voipCallBtn = document.getElementById('voip-call-btn');
 if (voipCallBtn) {
     voipCallBtn.addEventListener('click', async () => {
+        // STEP 0: Unlock AudioContext FIRST, while still in the gesture stack.
+        // This pre-authorizes all future audio.play() calls on mobile browsers,
+        // even after the gesture expires (which happens before ontrack fires).
+        unlockAudioContext();
+
         // CRITICAL FIX FOR MOBILE: Request microphone access FIRST, in the direct user gesture context.
         // Mobile browsers require getUserMedia to be called directly from a user gesture, 
         // not from within a Promise callback (like SweetAlert's .then()).
 
         try {
-            // Pre-request microphone access while still in gesture context
-            console.log("Requesting microphone access (for gesture context)...");
-            const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Immediately stop the test stream - we'll get a new one in startVoiceCall
-            testStream.getTracks().forEach(track => track.stop());
+            // STEP 1: Request microphone access IMMEDIATELY in the gesture context.
+            // This is the only reliable way to get a working stream on mobile browsers.
+            console.log("Requesting microphone access (direct gesture context)...");
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             console.log("Microphone access granted!");
 
-            // Now show confirmation (user already granted mic access)
+            // Now show confirmation
             const result = await Swal.fire({
                 title: 'Start Voice Call?',
                 text: "This will broadcast a call invitation to everyone in the room.",
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: 'Call Now'
+                confirmButtonText: 'Call Now',
+                confirmButtonColor: '#4F46E5',
+                cancelButtonText: 'Cancel'
             });
 
             if (result.isConfirmed) {
+                // localStream is already set and active, so startVoiceCall will use it
                 startVoiceCall();
+            } else {
+                // If the user cancelled, we must stop the tracks to release the microphone
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
             }
         } catch (err) {
-            console.error("Microphone access denied:", err);
+            console.error("Microphone access denied or error:", err);
             Swal.fire({
                 title: 'Microphone Required',
                 text: 'Please allow microphone access to use voice calls.',
@@ -136,18 +149,26 @@ if (voipCallBtn) {
 const videoCallBtn = document.getElementById('video-call-btn');
 if (videoCallBtn) {
     videoCallBtn.addEventListener('click', async () => {
+        // STEP 0: Unlock AudioContext FIRST, while still in the gesture stack.
+        unlockAudioContext();
+
         try {
-            // Pre-request camera and microphone access while still in gesture context
-            console.log("Requesting camera and microphone access (for gesture context)...");
-            const testStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            // Immediately stop the test stream - we'll get a new one in startVideoCall
-            testStream.getTracks().forEach(track => track.stop());
+            // STEP 1: Request camera and microphone access IMMEDIATELY in the gesture context.
+            console.log("Requesting camera/mic access (direct gesture context)...");
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                },
+                audio: true
+            });
             console.log("Camera and microphone access granted!");
 
             // Now show confirmation
             const result = await Swal.fire({
                 title: 'Start Video Call? 📹',
-                text: "This will broadcast a video call invitation to selected participants (or everyone if none selected).",
+                text: "This will broadcast a video call invitation to everyone in the room.",
                 icon: 'question',
                 iconColor: '#10b981',
                 showCancelButton: true,
@@ -157,10 +178,17 @@ if (videoCallBtn) {
             });
 
             if (result.isConfirmed) {
+                // localStream is already set, startVideoCall will use it
                 startVideoCall();
+            } else {
+                // If cancelled, release devices
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
             }
         } catch (err) {
-            console.error("Camera/Microphone access denied:", err);
+            console.error("Camera/Microphone access denied or error:", err);
             Swal.fire({
                 title: 'Camera & Microphone Required',
                 text: 'Please allow camera and microphone access to use video calls.',
@@ -299,6 +327,9 @@ if (deleteSelectedBtn) deleteSelectedBtn.onclick = deleteSelectedMessages;
 const joinCallBtn = document.getElementById('join-call-btn');
 if (joinCallBtn) {
     joinCallBtn.addEventListener('click', () => {
+        // Unlock audio in this gesture so remote audio plays when ontrack fires
+        unlockAudioContext();
+
         console.log(`Joining active call of type: ${window.activeCallType}`);
         if (window.activeCallType === 'video') {
             startVideoCall();
@@ -493,9 +524,13 @@ async function startVoiceCall() {
     try {
         isVideoCall = false;
 
-        // Get microphone access
-        console.log("Step 1: Requesting microphone access...");
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Get microphone access ONLY if we don't have it yet (it should be set by the click handler)
+        if (!localStream || !localStream.active || localStream.getAudioTracks().length === 0) {
+            console.log("Step 1: Requesting new microphone access...");
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } else {
+            console.log("Step 1: Using existing microphone stream.");
+        }
 
         // Determine targets: Selected participants or everyone else in the room
         const targets = selectedCallParticipants.size > 0
@@ -564,15 +599,20 @@ async function startVideoCall() {
     try {
         isVideoCall = true;
 
-        // Get camera and microphone access
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user'
-            },
-            audio: true
-        });
+        // Get camera and microphone access ONLY if we don't have it yet
+        if (!localStream || !localStream.active || localStream.getVideoTracks().length === 0) {
+            console.log("Step 1: Requesting new camera and microphone access...");
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                },
+                audio: true
+            });
+        } else {
+            console.log("Step 1: Using existing camera/mic stream.");
+        }
 
         // Show local video preview
         const localVideo = document.getElementById('local-video');
