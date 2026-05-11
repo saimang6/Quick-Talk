@@ -226,8 +226,17 @@ document.addEventListener('visibilitychange', () => {
 
         // CRITICAL: Skip aggressive reconnect if a voice call is active
         // Closing the WebSocket during a call can disrupt the WebRTC connection
-        if (peerConnection && peerConnection.connectionState !== 'closed') {
-            console.log("Voice call active - skipping socket refresh to preserve call.");
+        const callOverlay = document.getElementById('call-interface-overlay');
+        const videoOverlay = document.getElementById('video-call-overlay');
+        const isCallUIActive =
+            (callOverlay && !callOverlay.classList.contains('hidden')) ||
+            (videoOverlay && !videoOverlay.classList.contains('hidden'));
+        const hasPendingCall =
+            (typeof pendingCallData !== 'undefined' && pendingCallData) ||
+            (typeof pendingVideoCallData !== 'undefined' && pendingVideoCallData);
+
+        if ((peerConnection && peerConnection.connectionState !== 'closed') || peerConnections.size > 0 || hasPendingCall || isCallUIActive) {
+            console.log("Call active or pending - skipping socket refresh to preserve WebRTC signaling.");
             return;
         }
 

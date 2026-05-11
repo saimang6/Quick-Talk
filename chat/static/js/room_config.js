@@ -7,6 +7,8 @@ var fixedUsername = JSON.parse(document.getElementById('user-name').textContent)
 var creatorUsernameContext = JSON.parse(document.getElementById('creator-username').textContent);
 var roomSlug = JSON.parse(document.getElementById('room-slug').textContent);
 var isOwner = JSON.parse(document.getElementById('is-owner').textContent);
+var turnCredentialsUrl = JSON.parse(document.getElementById('turn-credentials-url').textContent);
+window.turnCredentialsUrl = turnCredentialsUrl;
 
 // --- DOM ELEMENT SELECTION ---
 var messageInputDom = document.querySelector('#chat-message-input');

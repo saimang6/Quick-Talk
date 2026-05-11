@@ -42,15 +42,50 @@ let iceConfig = {
 };
 
 /**
- * Returns unlimited TURN server credentials from the Open Relay Project.
- * This replaces the rate-limited Metered.ca API to allow unlimited calls.
- * @returns {Promise<Object>} ICE configuration with robust TURN fallback
+ * Returns ICE servers for WebRTC. Cross-network calls need a real TURN relay;
+ * STUN-only/local candidates usually work only on the same LAN or permissive NATs.
+ * @returns {Promise<Object>} ICE configuration
  */
 async function fetchTurnCredentials() {
-    console.log("Using Unlimited Open Relay Project TURN servers...");
+    if (window.turnCredentialsUrl) {
+        try {
+            console.log("Fetching configured TURN credentials...");
+            const response = await fetch(window.turnCredentialsUrl, { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error(`TURN credentials request failed with ${response.status}`);
+            }
 
-    // Static configuration for Open Relay Project
-    // Unlimited, community-funded STUN/TURN servers
+            const payload = await response.json();
+            const iceServers = Array.isArray(payload) ? payload : payload.iceServers;
+            if (!Array.isArray(iceServers) || iceServers.length === 0) {
+                throw new Error('TURN credentials response did not include iceServers');
+            }
+
+            const hasTurnServer = iceServers.some(server => {
+                const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+                return urls.some(url => typeof url === 'string' && url.startsWith('turn'));
+            });
+
+            if (!hasTurnServer) {
+                throw new Error('TURN credentials response did not include any turn/turns servers');
+            }
+
+            console.log("Using configured TURN relay servers:", iceServers.map(server => server.urls));
+            return {
+                iceServers,
+                iceTransportPolicy: 'relay',
+                iceCandidatePoolSize: 10
+            };
+        } catch (error) {
+            console.error("Configured TURN credentials could not be loaded:", error);
+            displayMessage('System', 'Call relay configuration failed. Cross-network calls may not connect.', 'turn-error-' + Date.now());
+        }
+    }
+
+    console.warn("No TURN_CREDENTIALS_URL configured. Same-network calls may work, but cross-network calls usually need TURN relay.");
+
+    // Fallback for local development only. A real TURN credentials endpoint is
+    // required for reliable calls between different networks.
     const config = {
         iceServers: [
             // Standard Google STUN servers (Fastest for P2P discovery)
@@ -292,11 +327,9 @@ function toggleMic() {
 
 function toggleSpeaker() {
     isSpeakerMuted = !isSpeakerMuted;
-    const remoteAudio = document.getElementById('remote-voip-audio');
-
-    if (remoteAudio) {
-        remoteAudio.muted = isSpeakerMuted;
-    }
+    document.querySelectorAll('audio[id^="remote-audio-"], #remote-voip-audio').forEach(audio => {
+        audio.muted = isSpeakerMuted;
+    });
 
     const speakerBtn = document.getElementById('speaker-call-btn');
     if (speakerBtn) {
@@ -312,6 +345,87 @@ function toggleSpeaker() {
     }
 
     console.log("Speaker " + (isSpeakerMuted ? "muted" : "unmuted"));
+}
+
+function setRemoteAudioElementDefaults(audioEl) {
+    audioEl.autoplay = true;
+    audioEl.playsInline = true;
+    audioEl.setAttribute('playsinline', 'true');
+    audioEl.setAttribute('webkit-playsinline', 'true');
+    audioEl.volume = 1.0;
+    audioEl.muted = isSpeakerMuted;
+}
+
+function attachRemoteAudioStream(audioId, stream, peerLabel = 'remote peer') {
+    let remoteAudio = document.getElementById(audioId);
+    if (remoteAudio) {
+        remoteAudio.pause();
+        remoteAudio.srcObject = null;
+        remoteAudio.remove();
+    }
+
+    remoteAudio = document.createElement('audio');
+    remoteAudio.id = audioId;
+    setRemoteAudioElementDefaults(remoteAudio);
+    remoteAudio.srcObject = stream;
+    document.body.appendChild(remoteAudio);
+    routeRemoteAudioViaContext(audioId, stream, peerLabel);
+
+    const ensurePlayback = async () => {
+        if (window._sharedAudioContext && window._sharedAudioContext.state === 'suspended') {
+            try {
+                await window._sharedAudioContext.resume();
+            } catch (e) {
+                console.warn(`[Audio] Could not resume AudioContext before playing ${peerLabel}:`, e);
+            }
+        }
+
+        await remoteAudio.play();
+        remoteAudio.muted = isSpeakerMuted;
+        console.log(`[Audio] HTML audio playback active for ${peerLabel}`);
+    };
+
+    ensurePlayback().catch(e => {
+        console.warn(`[Audio] HTML audio play() failed for ${peerLabel}:`, e);
+        setTimeout(() => {
+            ensurePlayback().catch(err => {
+                console.warn(`[Audio] Retry also failed for ${peerLabel}:`, err);
+                displayMessage('System', '🔊 Tap anywhere to enable call audio.', 'audio-enable-' + Date.now());
+                document.addEventListener('click', function resumeAudio() {
+                    ensurePlayback().catch(() => {});
+                    document.removeEventListener('click', resumeAudio);
+                }, { once: true });
+            });
+        }, 500);
+    });
+
+    return remoteAudio;
+}
+
+function routeRemoteAudioViaContext(audioId, stream, peerLabel = 'remote peer') {
+    if (!window._sharedAudioContext) return;
+
+    try {
+        if (!window._peerAudioSources) window._peerAudioSources = {};
+
+        if (window._peerAudioSources[audioId]) {
+            try { window._peerAudioSources[audioId].disconnect(); } catch (_) {}
+            delete window._peerAudioSources[audioId];
+        }
+
+        if (window._sharedAudioContext.state === 'suspended') {
+            window._sharedAudioContext.resume().catch(e => {
+                console.warn(`[Audio] Could not resume AudioContext for ${peerLabel}:`, e);
+            });
+        }
+
+        const sourceNode = window._sharedAudioContext.createMediaStreamSource(stream);
+        sourceNode.connect(window._sharedAudioContext.destination);
+        window._peerAudioSources[audioId] = sourceNode;
+        console.log(`[Audio] Web Audio backup route active for ${peerLabel}`);
+    } catch (e) {
+        console.warn(`[Audio] Web Audio backup route failed for ${peerLabel}:`, e);
+    }
 }
 
 function hideCallInterface() {
@@ -806,8 +920,8 @@ async function createPeerConnectionForUser(peerId) {
         peerConnections.delete(peerId);
     }
 
-    // Clear any stale candidates/queues for this peer
-    iceCandidateQueues.delete(peerId);
+    // Preserve candidates that arrived before this RTCPeerConnection existed.
+    // Mobile browsers often emit ICE candidates quickly, before the callee taps Accept.
     if (!iceCandidateQueues.has(peerId)) {
         iceCandidateQueues.set(peerId, []);
     }
@@ -828,12 +942,14 @@ async function createPeerConnectionForUser(peerId) {
     // ICE candidate handler - send to specific peer
     pc.onicecandidate = (event) => {
         if (event.candidate && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-            console.log(`Sending ICE candidate to ${peerId}`);
+            console.log(`Sending ICE candidate to ${peerId}:`, event.candidate.type, event.candidate.protocol);
             chatSocket.send(JSON.stringify({
                 'type': 'webrtc_signal',
                 'data': { 'ice': event.candidate },
                 'target_users': [peerId]
             }));
+        } else if (!event.candidate) {
+            console.log(`ICE candidate gathering complete for ${peerId}`);
         }
     };
 
@@ -873,74 +989,15 @@ async function createPeerConnectionForUser(peerId) {
                 videoElement.play().catch(e => console.warn(`Video play blocked for ${peerId}:`, e));
             }
         } else if (event.track.kind === 'audio' && !isVideoCall) {
-            // Voice-only call — route audio from this peer.
+            // Voice-only call — mobile browsers are more reliable with a real
+            // HTMLAudioElement sink than with Web Audio as the primary output path.
             console.log(`[Audio] Received audio track from ${peerId}.`);
 
             const stream = (event.streams && event.streams[0])
                 ? event.streams[0]
                 : new MediaStream([event.track]);
 
-            // ── PRIMARY PATH: Web Audio API ──────────────────────────────────
-            // Once unlockAudioContext() is called during a user gesture, the
-            // AudioContext stays "running" forever. Routing streams through it
-            // never needs another gesture, which is why this works even when
-            // ontrack fires long after the call-initiation tap expired on mobile.
-            let routedViaWebAudio = false;
-            if (window._sharedAudioContext) {
-                try {
-                    // Disconnect any old source node for this peer
-                    if (window._peerAudioSources && window._peerAudioSources[peerId]) {
-                        try { window._peerAudioSources[peerId].disconnect(); } catch (_) {}
-                    }
-                    if (!window._peerAudioSources) window._peerAudioSources = {};
-
-                    // Resume context if it got suspended
-                    if (window._sharedAudioContext.state === 'suspended') {
-                        await window._sharedAudioContext.resume();
-                    }
-
-                    const srcNode = window._sharedAudioContext.createMediaStreamSource(stream);
-                    srcNode.connect(window._sharedAudioContext.destination);
-                    window._peerAudioSources[peerId] = srcNode;
-                    routedViaWebAudio = true;
-                    console.log(`[Audio] Routed ${peerId} via AudioContext (state: ${window._sharedAudioContext.state})`);
-                } catch (e) {
-                    console.warn(`[Audio] Web Audio routing failed for ${peerId}, falling back to <audio>:`, e);
-                }
-            }
-
-            // ── FALLBACK PATH: HTML <audio> element ──────────────────────────
-            // Always create the element so the muted-autoplay trick gives us a
-            // second chance if the AudioContext path is unavailable or fails.
-            let remoteAudio = document.getElementById(`remote-audio-${peerId}`);
-            if (remoteAudio) {
-                remoteAudio.srcObject = null;
-                remoteAudio.remove();
-            }
-            remoteAudio = document.createElement('audio');
-            remoteAudio.id = `remote-audio-${peerId}`;
-            remoteAudio.playsInline = true;
-            remoteAudio.muted = true;   // muted autoplay is always allowed
-            remoteAudio.srcObject = stream;
-            document.body.appendChild(remoteAudio);
-
-            remoteAudio.play().then(() => {
-                // If Web Audio is already handling it, keep muted to avoid echo.
-                // Otherwise unmute so the user can actually hear.
-                if (!routedViaWebAudio) {
-                    remoteAudio.muted = false;
-                    console.log(`[Audio] HTML element playing (unmuted) for ${peerId}`);
-                } else {
-                    console.log(`[Audio] HTML element playing (muted, Web Audio is primary) for ${peerId}`);
-                }
-            }).catch(e => {
-                console.warn(`[Audio] HTML element play() failed for ${peerId}:`, e);
-                setTimeout(() => {
-                    remoteAudio.play().then(() => {
-                        if (!routedViaWebAudio) remoteAudio.muted = false;
-                    }).catch(err => console.warn(`[Audio] Retry also failed for ${peerId}:`, err));
-                }, 500);
-            });
+            attachRemoteAudioStream(`remote-audio-${peerId}`, stream, peerId);
 
             // Update the voice call overlay participant list
             updateVoiceCallParticipantList();
@@ -1178,64 +1235,14 @@ async function createPeerConnection(preserveCandidates = false) {
                     remoteVideo.srcObject = event.streams[0];
                 }
             } else {
-                // Voice-only call — dual-path audio routing
+                // Voice-only call — use HTML audio as the primary output sink.
                 console.log('[Audio] Processing audio-only call (legacy handler)...');
 
                 const stream = (event.streams && event.streams[0])
                     ? event.streams[0]
                     : new MediaStream([event.track]);
 
-                // PRIMARY: Web Audio API (gesture-independent once unlocked)
-                let routedViaWebAudio = false;
-                if (window._sharedAudioContext) {
-                    try {
-                        if (window._sharedAudioContext.state === 'suspended') {
-                            await window._sharedAudioContext.resume();
-                        }
-                        const srcNode = window._sharedAudioContext.createMediaStreamSource(stream);
-                        srcNode.connect(window._sharedAudioContext.destination);
-                        routedViaWebAudio = true;
-                        console.log('[Audio] Legacy handler: routed via AudioContext.');
-                    } catch (e) {
-                        console.warn('[Audio] Legacy Web Audio routing failed, using <audio>:', e);
-                    }
-                }
-
-                // FALLBACK: HTML audio element with muted-autoplay trick
-                let remoteAudio = document.getElementById('remote-voip-audio');
-                if (remoteAudio) {
-                    remoteAudio.pause();
-                    remoteAudio.srcObject = null;
-                    remoteAudio.remove();
-                }
-                remoteAudio = document.createElement('audio');
-                remoteAudio.id = 'remote-voip-audio';
-                remoteAudio.setAttribute('playsinline', 'true');
-                remoteAudio.volume = 1.0;
-                remoteAudio.muted = true;
-                remoteAudio.srcObject = stream;
-                document.body.appendChild(remoteAudio);
-
-                remoteAudio.play().then(() => {
-                    if (!routedViaWebAudio) {
-                        remoteAudio.muted = false;
-                        console.log('[Audio] Legacy HTML element playing (unmuted).');
-                    }
-                }).catch(e => {
-                    console.warn('[Audio] Legacy HTML play() failed:', e);
-                    setTimeout(() => {
-                        remoteAudio.play().then(() => {
-                            if (!routedViaWebAudio) remoteAudio.muted = false;
-                        }).catch(() => {
-                            displayMessage('System', '🔊 Tap anywhere to enable call audio.', Date.now());
-                            document.addEventListener('click', function resumeAudio() {
-                                remoteAudio.muted = false;
-                                remoteAudio.play().catch(() => {});
-                                document.removeEventListener('click', resumeAudio);
-                            }, { once: true });
-                        });
-                    }, 500);
-                });
+                attachRemoteAudioStream('remote-voip-audio', stream, 'legacy remote peer');
 
                 displayMessage('System', '🎙️ Voice call active.', 'voip-active-' + Date.now());
                 showCallInterface();
@@ -2407,4 +2414,3 @@ async function connectToRemainingParticipants(excludeUser) {
         }));
     }
 }
-

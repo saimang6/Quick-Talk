@@ -189,5 +189,10 @@ CACHES = {
     }
 }
 
+# Optional WebRTC TURN credentials endpoint.
+# Example:
+# TURN_CREDENTIALS_URL=https://yourapp.metered.live/api/v1/turn/credentials?apiKey=YOUR_API_KEY
+TURN_CREDENTIALS_URL = os.getenv('TURN_CREDENTIALS_URL', '')
+
 # NOTE: You will need to install the 'django-redis' library 
 # (e.g., pip install django-redis)

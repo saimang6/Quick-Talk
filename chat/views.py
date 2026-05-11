@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.utils.text import slugify
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponseForbidden
@@ -7,6 +8,9 @@ from django.views.decorators.http import require_POST
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Room, Message 
+import json
+import urllib.request
+import urllib.error
 
 # 1. Welcome Page (Index) - Used to set the username
 def index(request):
@@ -52,6 +56,20 @@ def get_rooms_json(request):
     active_rooms = list(all_rooms)
             
     return JsonResponse({'rooms': active_rooms})
+
+def get_turn_credentials(request):
+    """Proxy TURN credentials so the API key is not exposed to the browser."""
+    credentials_url = getattr(settings, 'TURN_CREDENTIALS_URL', '')
+    if not credentials_url:
+        return JsonResponse({'error': 'TURN_CREDENTIALS_URL is not configured'}, status=503)
+
+    try:
+        with urllib.request.urlopen(credentials_url, timeout=8) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return JsonResponse({'error': f'Could not load TURN credentials: {exc}'}, status=502)
+
+    return JsonResponse(payload, safe=not isinstance(payload, list))
 
 @require_POST
 @csrf_exempt
@@ -305,6 +323,7 @@ def room(request, room_slug):
         'username': username,
         'is_owner': is_owner,
         'creator_username': room_obj.owner_username,
+        'turn_credentials_url': reverse('get_turn_credentials') if getattr(settings, 'TURN_CREDENTIALS_URL', '') else '',
     })
     
     # 1. Stops all caching by the browser and proxies

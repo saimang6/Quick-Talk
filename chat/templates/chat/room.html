@@ -420,6 +420,7 @@
 {{ room_slug|json_script:"room-slug" }}
 {{ is_owner|json_script:"is-owner" }}
 {{ creator_username|json_script:"creator-username" }}
+{{ turn_credentials_url|json_script:"turn-credentials-url" }}
 
 <div class="full-screen-wrapper flex-grow flex items-center justify-center overflow-hidden">
     <div class="main-chat-container {% if not is_owner %}hidden-chat-interface{% endif %}">

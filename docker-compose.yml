@@ -34,6 +34,9 @@ services:
 
       # FIX: THIS IS THE MISSING VARIABLE
       DJANGO_SETTINGS_MODULE: ChatProject.settings
+
+      # Optional: required for reliable WebRTC calls between different networks.
+      TURN_CREDENTIALS_URL: ${TURN_CREDENTIALS_URL:-}
     
   # 2. MySQL Database Service
   db:
