@@ -70,10 +70,14 @@ async function fetchTurnCredentials() {
                 throw new Error('TURN credentials response did not include any turn/turns servers');
             }
 
-            console.log("Using configured TURN relay servers:", iceServers.map(server => server.urls));
+            const preferredIceServers = [
+                ...iceConfig.iceServers,
+                ...iceServers
+            ];
+
+            console.log("Using STUN-first ICE configuration with TURN fallback:", preferredIceServers.map(server => server.urls));
             return {
-                iceServers,
-                iceTransportPolicy: 'relay',
+                iceServers: preferredIceServers,
                 iceCandidatePoolSize: 10
             };
         } catch (error) {

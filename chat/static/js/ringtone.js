@@ -6,10 +6,9 @@
 class RingtoneManager {
     constructor() {
         this.audioContext = null;
-        this.oscillator = null;
-        this.gainNode = null;
         this.isPlaying = false;
         this.audioElement = null; // Alternative: HTML5 Audio element
+        this.patternTimeout = null;
     }
 
     /**
@@ -23,7 +22,7 @@ class RingtoneManager {
 
     /**
      * Plays a ringtone using Web Audio API
-     * Creates a pleasant dual-tone ringtone pattern
+     * Creates a soft, bell-like repeating ringtone pattern
      */
     async playWebAudioRingtone() {
         if (this.isPlaying) return;
@@ -43,44 +42,53 @@ class RingtoneManager {
 
         this.isPlaying = true;
 
-        // Create a repeating pattern
-        const playTone = () => {
-            if (!this.isPlaying) return;
-
-            // Create two oscillators for a richer sound
-            const osc1 = this.audioContext.createOscillator();
-            const osc2 = this.audioContext.createOscillator();
+        const playChord = (frequencies, durationMs) => {
             const gainNode = this.audioContext.createGain();
-
-            // Configure frequencies (pleasant dual-tone)
-            osc1.frequency.value = 800; // First tone (E5)
-            osc2.frequency.value = 1000; // Second tone (B5)
-
-            // Configure volume
-            gainNode.gain.value = 0.3; // Increased to 30% volume for better audibility
-
-            // Connect oscillators through gain to output
-            osc1.connect(gainNode);
-            osc2.connect(gainNode);
+            gainNode.gain.setValueAtTime(0.0001, this.audioContext.currentTime);
             gainNode.connect(this.audioContext.destination);
 
-            // Start oscillators
-            osc1.start();
-            osc2.start();
+            frequencies.forEach((frequency, index) => {
+                const oscillator = this.audioContext.createOscillator();
+                const partialGain = this.audioContext.createGain();
 
-            // First tone duration: 400ms
-            setTimeout(() => {
-                osc1.stop();
-                osc2.stop();
+                oscillator.type = index === 0 ? 'sine' : 'triangle';
+                oscillator.frequency.value = frequency;
 
-                // Pause for 200ms, then play again
-                if (this.isPlaying) {
-                    setTimeout(playTone, 200);
-                }
-            }, 400);
+                partialGain.gain.value = index === 0 ? 0.4 : 0.2;
+                oscillator.connect(partialGain);
+                partialGain.connect(gainNode);
+
+                oscillator.start();
+                oscillator.stop(this.audioContext.currentTime + durationMs / 1000 + 0.05);
+            });
+
+            // Fast attack, gentle decay to avoid a harsh alarm feel.
+            gainNode.gain.exponentialRampToValueAtTime(0.48, this.audioContext.currentTime + 0.03);
+            gainNode.gain.exponentialRampToValueAtTime(
+                0.0001,
+                this.audioContext.currentTime + durationMs / 1000
+            );
         };
 
-        playTone();
+        const playPattern = () => {
+            if (!this.isPlaying) return;
+
+            // Two-note chime with a small upward lift, then a comfortable pause.
+            playChord([523.25, 659.25], 260); // C5 + E5
+
+            this.patternTimeout = setTimeout(() => {
+                if (!this.isPlaying) return;
+                playChord([587.33, 783.99], 320); // D5 + G5
+
+                this.patternTimeout = setTimeout(() => {
+                    if (this.isPlaying) {
+                        playPattern();
+                    }
+                }, 1400);
+            }, 340);
+        };
+
+        playPattern();
     }
 
     /**
@@ -132,6 +140,11 @@ class RingtoneManager {
 
         console.log('🔕 Stopping ringtone...');
         this.isPlaying = false;
+
+        if (this.patternTimeout) {
+            clearTimeout(this.patternTimeout);
+            this.patternTimeout = null;
+        }
 
         // Stop HTML5 audio if it's being used
         if (this.audioElement) {
