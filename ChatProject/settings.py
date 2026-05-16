@@ -175,7 +175,7 @@ default_cache = {
     "LOCATION": "quick-talk-local-cache",
 }
 
-if os.getenv("REDIS_URL") or IS_RENDER or env_bool("USE_REDIS", default=False):
+if env_bool("USE_REDIS", default=False):
     channel_hosts = [os.getenv("REDIS_URL", f"{redis_base}/{redis_db}")]
     cache_location = os.getenv("REDIS_CACHE_URL", f"{redis_base}/{redis_cache_db}")
 

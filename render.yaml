@@ -16,6 +16,8 @@ services:
         fromDatabase:
           name: quick-talk-db
           property: connectionString
+      - key: USE_REDIS
+        value: "false"
       - key: REDIS_URL
         fromService:
           type: keyvalue
