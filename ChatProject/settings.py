@@ -30,7 +30,13 @@ SECRET_KEY = os.getenv(
 DEBUG = env_bool("DEBUG", default=False)
 IS_RENDER = env_bool("RENDER", default=False)
 
-default_allowed_hosts = ["127.0.0.1", "localhost", "0.0.0.0"]
+default_allowed_hosts = [
+    "127.0.0.1",
+    "localhost",
+    "0.0.0.0",
+    ".ngrok-free.app",
+    ".ngrok-free.dev",
+]
 render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if render_hostname:
     default_allowed_hosts.append(render_hostname)
@@ -138,7 +144,7 @@ USE_TZ = True
 
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATICFILES_DIRS = []
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles_build")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
