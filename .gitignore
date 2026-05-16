@@ -1,8 +1,8 @@
 # Django
 *.log
-ChatProject/settings.py
 db.sqlite3
 db.sqlite3-journal
+staticfiles_build/
 
 # Secrets
 .env

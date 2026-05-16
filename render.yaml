@@ -1,0 +1,46 @@
+services:
+  - name: quick-talk-web
+    type: web
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input
+    startCommand: sh -c 'python manage.py migrate && daphne -b 0.0.0.0 -p ${PORT:-10000} ChatProject.asgi:application'
+    healthCheckPath: /
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: quick-talk-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: quick-talk-redis
+          property: connectionString
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: CSRF_COOKIE_SECURE
+        value: "true"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+
+  - name: quick-talk-redis
+    type: keyvalue
+    plan: free
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: quick-talk-db
+    plan: free
+    region: oregon
+    databaseName: quick_talk
