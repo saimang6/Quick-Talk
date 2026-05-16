@@ -1,4 +1,5 @@
 import json
+import logging
 from channels.generic.websocket import WebsocketConsumer
 from asgiref.sync import async_to_sync
 import uuid 
@@ -8,6 +9,7 @@ from .models import Room, Message, Reaction
 
 # --- CONFIGURATION ---
 MAX_INITIAL_MESSAGES = 100 
+logger = logging.getLogger(__name__)
 
 class ChatConsumer(WebsocketConsumer):
     
@@ -29,100 +31,109 @@ class ChatConsumer(WebsocketConsumer):
     # ----------------------------------------
     
     def connect(self):
-        self.room_slug = self.scope['url_route']['kwargs']['room_slug'] 
-        self.room_group_name = 'chat_%s' % self.room_slug
-        self.room_instance = None 
-        
-        # Extract Username and is_request flag from Query Parameters
-        query_params = self.scope['query_string'].decode()
-        parsed_qs = urllib.parse.parse_qs(query_params)
-        self.username = parsed_qs.get('username', ['Anonymous'])[0]
-        
-        # Check if the connection URL contains the request flag (meaning user is a requester)
-        is_request_join = parsed_qs.get('request', ['false'])[0] == 'true'
-        # Flags for owner access
-        is_owner_access_attempt = parsed_qs.get('owner_access', ['false'])[0] == 'true'
-        submitted_secret = parsed_qs.get('secret', [''])[0]
-
-        # --- Room Existence Check ---
-        is_new_room = 'new' in parsed_qs
         try:
-            if is_new_room:
-                 new_room_name = parsed_qs.get('name', [''])[0]
-                 owner_username = parsed_qs.get('owner_username', [''])[0] or self.username 
-                 # Get secret from parsed_qs
-                 new_room_secret = parsed_qs.get('secret', [''])[0]
+            self.room_slug = self.scope['url_route']['kwargs']['room_slug'] 
+            self.room_group_name = 'chat_%s' % self.room_slug
+            self.room_instance = None 
+            
+            # Extract Username and is_request flag from Query Parameters
+            query_params = self.scope['query_string'].decode()
+            parsed_qs = urllib.parse.parse_qs(query_params)
+            self.username = parsed_qs.get('username', ['Anonymous'])[0]
+            logger.warning(
+                "WebSocket connect start room=%s user=%s query=%s",
+                self.room_slug,
+                self.username,
+                query_params,
+            )
+            
+            # Check if the connection URL contains the request flag (meaning user is a requester)
+            is_request_join = parsed_qs.get('request', ['false'])[0] == 'true'
+            # Flags for owner access
+            is_owner_access_attempt = parsed_qs.get('owner_access', ['false'])[0] == 'true'
+            submitted_secret = parsed_qs.get('secret', [''])[0]
 
-                 if not Room.objects.filter(slug=self.room_slug).exists():
-                     self.room_instance = Room.objects.create(
-                         name=new_room_name,
-                         slug=self.room_slug,
-                         owner_username=owner_username,
-                         secret_number=new_room_secret
-                     )
+            # --- Room Existence Check ---
+            is_new_room = 'new' in parsed_qs
+            if is_new_room:
+                new_room_name = parsed_qs.get('name', [''])[0]
+                owner_username = parsed_qs.get('owner_username', [''])[0] or self.username 
+                # Get secret from parsed_qs
+                new_room_secret = parsed_qs.get('secret', [''])[0]
+
+                if not Room.objects.filter(slug=self.room_slug).exists():
+                    self.room_instance = Room.objects.create(
+                        name=new_room_name,
+                        slug=self.room_slug,
+                        owner_username=owner_username,
+                        secret_number=new_room_secret
+                    )
             
             if not self.room_instance:
                 self.room_instance = Room.objects.get(slug=self.room_slug)
-        except Room.DoesNotExist:
-            self.close(code=4004)
-            return
-        
-        # Verify ownership via session OR provided secret
-        session_secret = self.scope.get('session', {}).get(f'room_secret_{self.room_slug}')
-        
-        self.is_owner = (self.room_instance.owner_username == self.username) and (
-            self.room_instance.secret_number == submitted_secret or 
-            self.room_instance.secret_number == session_secret
-        )
+            
+            # Verify ownership via session OR provided secret
+            session_secret = self.scope.get('session', {}).get(f'room_secret_{self.room_slug}')
+            
+            self.is_owner = (self.room_instance.owner_username == self.username) and (
+                self.room_instance.secret_number == submitted_secret or 
+                self.room_instance.secret_number == session_secret
+            )
 
-        # === START FIX: Ensure proper close code transmission ===
-        if (self.room_instance.owner_username == self.username) and is_owner_access_attempt:
-            # Check 1: If the user has the owner's name and is trying to access as owner, 
-            # but failed the secret check (both submitted and session)
-            if not self.is_owner:
+            # === START FIX: Ensure proper close code transmission ===
+            if (self.room_instance.owner_username == self.username) and is_owner_access_attempt:
+                # Check 1: If the user has the owner's name and is trying to access as owner, 
+                # but failed the secret check (both submitted and session)
+                if not self.is_owner:
+                    
+                    # CRITICAL FIX: Accept connection first to transmit custom close code
+                    self.accept() 
+
+                    # Send a client-side message (optional, but good)
+                    self.send(text_data=json.dumps({
+                        'type': 'auth_failure', 
+                        'code': 'secret_mismatch',
+                        'message': 'Secret number incorrect. Closing connection.'
+                    }))
+                    
+                    # DENY ACCESS - Close the connection with a specific code (4005)
+                    self.close(code=4005) 
+                    print(f"Owner impersonation attempt by {self.username} failed due to secret mismatch.")
+                    return
+                # If the secret matches, the user is confirmed as the owner.
+            
+            elif is_owner_access_attempt and not self.is_owner:
+                # Check 2: If a NON-OWNER tries to use the owner_access flag 
                 
                 # CRITICAL FIX: Accept connection first to transmit custom close code
                 self.accept() 
-
-                # Send a client-side message (optional, but good)
-                self.send(text_data=json.dumps({
-                    'type': 'auth_failure', 
-                    'code': 'secret_mismatch',
-                    'message': 'Secret number incorrect. Closing connection.'
-                }))
                 
-                # DENY ACCESS - Close the connection with a specific code (4005)
-                self.close(code=4005) 
-                print(f"Owner impersonation attempt by {self.username} failed due to secret mismatch.")
+                self.close(code=4006)
+                print(f"Non-owner {self.username} attempted illegal owner access.")
                 return
-            # If the secret matches, the user is confirmed as the owner.
-        
-        elif is_owner_access_attempt and not self.is_owner:
-            # Check 2: If a NON-OWNER tries to use the owner_access flag 
-            
-            # CRITICAL FIX: Accept connection first to transmit custom close code
-            self.accept() 
-            
-            self.close(code=4006)
-            print(f"Non-owner {self.username} attempted illegal owner access.")
-            return
 
-        # Check 3: If the user has the OWNER's USERNAME but didn't provide a secret.
-        if (self.username == self.room_instance.owner_username) and (not self.is_owner) and (not is_owner_access_attempt):
-            is_request_join = True 
-        # ======================================================================
+            # Check 3: If the user has the OWNER's USERNAME but didn't provide a secret.
+            if (self.username == self.room_instance.owner_username) and (not self.is_owner) and (not is_owner_access_attempt):
+                is_request_join = True 
+            # ======================================================================
 
-        # === FINAL ACCEPT FOR SUCCESSFUL CONNECTION PATH ===
-        # Accept connection immediately (This is the only remaining accept() call for success)
-        self.accept()
+            # === FINAL ACCEPT FOR SUCCESSFUL CONNECTION PATH ===
+            # Accept connection immediately (This is the only remaining accept() call for success)
+            self.accept()
+            logger.warning(
+                "WebSocket accepted room=%s user=%s owner=%s pending_check_start",
+                self.room_slug,
+                self.username,
+                self.is_owner,
+            )
+            
+            self.send(text_data=json.dumps({
+                'type': 'room_info',
+                'room_name': self.room_instance.name,
+                'creator_username': self.room_instance.owner_username,
+            }))
         
-        self.send(text_data=json.dumps({
-            'type': 'room_info',
-            'room_name': self.room_instance.name,
-            'creator_username': self.room_instance.owner_username,
-        }))
-        
-        # ------------------------------------------------------------------
+            # ------------------------------------------------------------------
         # Initialize nested dictionaries if they don't exist
         self.ROOM_USERS.setdefault(self.room_slug, {})
         self.ROOM_TYPERS.setdefault(self.room_slug, set())
@@ -228,22 +239,41 @@ class ChatConsumer(WebsocketConsumer):
             # or they can just wait for a new approval.
         
         # 7. Always Sync the request count for the owner on connect
-        if self.is_owner:
-            self.broadcast_request_count_to_owner() 
+            if self.is_owner:
+                self.broadcast_request_count_to_owner() 
             
         # 8. CLEANUP STALE USERS (New Logic)
         # Check for users who disconnected > 2.5 minutes ago and haven't returned.
         # This handles users who closed the tab but didn't trigger 'explicit_leave' 
         # (e.g., browser crash or just closed tab on mobile)
-        self.cleanup_stale_users()
+            self.cleanup_stale_users()
         
         # --- CATCH-UP LOGIC START ---
         # Only send history to users who are ACTIVE
-        if not self.is_pending:
-            last_seen_time = self.USER_LAST_SEEN.get(self.room_slug, {}).get(self.username)
-            if last_seen_time:
-                 self.send_catch_up_messages(last_seen_time)
-        # ------------------------------------------------------------------
+            if not self.is_pending:
+                last_seen_time = self.USER_LAST_SEEN.get(self.room_slug, {}).get(self.username)
+                if last_seen_time:
+                     self.send_catch_up_messages(last_seen_time)
+            logger.warning(
+                "WebSocket connect complete room=%s user=%s pending=%s active_users=%s",
+                self.room_slug,
+                self.username,
+                self.is_pending,
+                list(self.ROOM_USERS.get(self.room_slug, {}).keys()),
+            )
+            # ------------------------------------------------------------------
+        except Room.DoesNotExist:
+            logger.warning("WebSocket room missing room=%s user=%s", getattr(self, "room_slug", "?"), getattr(self, "username", "?"))
+            self.close(code=4004)
+            return
+        except Exception:
+            logger.exception(
+                "WebSocket connect crashed room=%s user=%s",
+                getattr(self, "room_slug", "?"),
+                getattr(self, "username", "?"),
+            )
+            self.close(code=1011)
+            return
 
     def disconnect(self, close_code):
         if self.room_slug in self.USER_LAST_SEEN:
