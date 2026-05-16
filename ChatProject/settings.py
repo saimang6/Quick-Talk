@@ -29,6 +29,7 @@ SECRET_KEY = os.getenv(
 
 DEBUG = env_bool("DEBUG", default=False)
 IS_RENDER = env_bool("RENDER", default=False)
+IS_KOYEB = bool(os.getenv("KOYEB_PUBLIC_DOMAIN"))
 
 default_allowed_hosts = [
     "127.0.0.1",
@@ -40,17 +41,24 @@ default_allowed_hosts = [
 render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if render_hostname:
     default_allowed_hosts.append(render_hostname)
+koyeb_hostname = os.getenv("KOYEB_PUBLIC_DOMAIN", "").strip()
+if koyeb_hostname:
+    default_allowed_hosts.append(koyeb_hostname)
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default_allowed_hosts)
 
 default_csrf_trusted_origins = [
     "https://*.onrender.com",
+    "https://*.koyeb.app",
     "https://*.ngrok-free.app",
     "https://*.ngrok-free.dev",
 ]
 render_external_url = os.getenv("RENDER_EXTERNAL_URL", "").strip()
 if render_external_url:
     default_csrf_trusted_origins.append(render_external_url)
+koyeb_public_domain = os.getenv("KOYEB_PUBLIC_DOMAIN", "").strip()
+if koyeb_public_domain:
+    default_csrf_trusted_origins.append(f"https://{koyeb_public_domain}")
 
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",
@@ -204,9 +212,10 @@ CACHES = {
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=IS_RENDER and not DEBUG)
-SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", default=IS_RENDER and not DEBUG)
-CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=IS_RENDER and not DEBUG)
+is_managed_https = (IS_RENDER or IS_KOYEB) and not DEBUG
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=is_managed_https)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", default=is_managed_https)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", default=is_managed_https)
 
 
 TURN_CREDENTIALS_URL = os.getenv("TURN_CREDENTIALS_URL", "")
