@@ -132,128 +132,97 @@ class ChatConsumer(WebsocketConsumer):
                 'room_name': self.room_instance.name,
                 'creator_username': self.room_instance.owner_username,
             }))
-        
+
             # ------------------------------------------------------------------
-        # Initialize nested dictionaries if they don't exist
-        self.ROOM_USERS.setdefault(self.room_slug, {})
-        self.ROOM_TYPERS.setdefault(self.room_slug, set())
-        self.ROOM_REQUESTERS.setdefault(self.room_slug, {})
-        self.ROOM_ACTIVE_CONNECTIONS.setdefault(self.room_slug, set())
-        self.ROOM_CALL_PARTICIPANTS.setdefault(self.room_slug, set())
+            # Initialize nested dictionaries if they don't exist
+            self.ROOM_USERS.setdefault(self.room_slug, {})
+            self.ROOM_TYPERS.setdefault(self.room_slug, set())
+            self.ROOM_REQUESTERS.setdefault(self.room_slug, {})
+            self.ROOM_ACTIVE_CONNECTIONS.setdefault(self.room_slug, set())
+            self.ROOM_CALL_PARTICIPANTS.setdefault(self.room_slug, set())
 
-        # Mark this user as ACTIVELY CONNECTED
-        self.ROOM_ACTIVE_CONNECTIONS[self.room_slug].add(self.username)
-        
-        # Initialize last seen for this room if not exists
-        self.USER_LAST_SEEN.setdefault(self.room_slug, {})
-        
-        # --- CRITICAL FIX: Determine initial pending state ---
-        # 1. First, check if the client URL indicates a join request.
-        is_request_attempt = is_request_join and not self.is_owner
-        
-        # 2. Check the persistent list (DB) to see if the user was accepted/denied while offline.
-        persistent_requesters = self._get_persistent_requesters()
-        is_still_pending_in_db = self.username in persistent_requesters
-        
-        # For simplicity and safety, we only mark them as pending if the URL flag is set.
-        # UPDATE: User wants re-request on every connection/reload.
-        # REVISED (Soft Reconnect): If user is currently active in the room (e.g. just tab switched),
-        # allow them to rejoin without pending status.
-        is_active_in_room = self.username in self.ROOM_USERS.get(self.room_slug, {})
-        
-        self.is_pending = not self.is_owner and not is_active_in_room
-        # ----------------------------------------------------------------------
-        
-        # Determine if this is truly a timeout (was active in this room before)
-        is_returning_to_room = self.username in self.USER_LAST_SEEN.get(self.room_slug, {})
-        
-        # --- NEW CONNECTION LOGIC: PENDING VS ACTIVE ---
-        
-        if self.is_pending:
-            # PENDING LOGIC (This runs for ANY new join request, and on reconnect if they haven't been approved yet)
+            # Mark this user as ACTIVELY CONNECTED
+            self.ROOM_ACTIVE_CONNECTIONS[self.room_slug].add(self.username)
             
-            # 1. Notify the client immediately that they are in pending state
-            # This is crucial for users returning after a timeout who assume they are still active.
-            self.send(text_data=json.dumps({
-                'type': 'session_status',
-                'status': 'pending', 
-                'reason': 'timeout' if is_returning_to_room and not is_new_room and not is_request_join else 'new_join'
-            }))
+            # Initialize last seen for this room if not exists
+            self.USER_LAST_SEEN.setdefault(self.room_slug, {})
             
-            # 1. PENDING: Only track their channel for direct messages (approval/denial)
-            self.ROOM_REQUESTERS[self.room_slug][self.username] = self.channel_name
+            # --- CRITICAL FIX: Determine initial pending state ---
+            # 1. First, check if the client URL indicates a join request.
+            is_request_attempt = is_request_join and not self.is_owner
             
-            # 2. DO NOT add them to the main room group (chat group)
-            # 3. DO NOT add them to the ROOM_USERS list (participant panel)
-            print(f"User {self.username} connected and is marked as PENDING.")
-
-            # Note: The 'join_request' message (which triggers persistence) is sent by the client after connect. 
-            # We don't send the notification here unless they are already in the DB.
-            if is_still_pending_in_db:
-                 owner_channel = self.ROOM_OWNER_CHANNELS.get(self.room_slug)
-                 if owner_channel:
-                     async_to_sync(self.channel_layer.send)(
-                         owner_channel,
-                         {
-                             'type': 'join_request_notification',
-                             'requester_username': self.username,
-                         }
-                     )
-        else:
-            # ACTIVE/OWNER LOGIC
+            # 2. Check the persistent list (DB) to see if the user was accepted/denied while offline.
+            persistent_requesters = self._get_persistent_requesters()
+            is_still_pending_in_db = self.username in persistent_requesters
             
-            # 0. Notify client of active status
-            self.send(text_data=json.dumps({
-                'type': 'session_status',
-                'status': 'active'
-            }))
-
-            # 1. Add user's channel to the main Channel Layer Group
-            print(f"Adding user {self.username} to group {self.room_group_name}...")
-            async_to_sync(self.channel_layer.group_add)(
-                self.room_group_name,
-                self.channel_name
-            )
-            print(f"User {self.username} successfully added to group.")
-
-            # 2. Add user to the ROOM_USERS list (for participant display)
-            user_joined = self.username not in self.ROOM_USERS.get(self.room_slug, {}) 
-            self.ROOM_USERS[self.room_slug][self.username] = self.channel_name 
+            # For simplicity and safety, we only mark them as pending if the URL flag is set.
+            # UPDATE: User wants re-request on every connection/reload.
+            # REVISED (Soft Reconnect): If user is currently active in the room (e.g. just tab switched),
+            # allow them to rejoin without pending status.
+            is_active_in_room = self.username in self.ROOM_USERS.get(self.room_slug, {})
             
-            # 3. Handle Owner Tracking
-            if self.is_owner:
-                self.ROOM_OWNER_CHANNELS[self.room_slug] = self.channel_name
+            self.is_pending = not self.is_owner and not is_active_in_room
+            # ----------------------------------------------------------------------
             
-            # 4. Execute Join Logic (Update last seen)
-            if user_joined:
-                self.USER_LAST_SEEN[self.room_slug][self.username] = timezone.now()
-                self.send_system_message(f"{self.username} has joined the room.")
+            # Determine if this is truly a timeout (was active in this room before)
+            is_returning_to_room = self.username in self.USER_LAST_SEEN.get(self.room_slug, {})
+            
+            # --- NEW CONNECTION LOGIC: PENDING VS ACTIVE ---
+            if self.is_pending:
+                self.send(text_data=json.dumps({
+                    'type': 'session_status',
+                    'status': 'pending', 
+                    'reason': 'timeout' if is_returning_to_room and not is_new_room and not is_request_join else 'new_join'
+                }))
                 
-            # 5. Broadcast the updated user list
-            self.broadcast_user_list(send_join_message=False)
-            
-            # --- REMOVED OVER-EAGER ACCESS GRANTED ---
-            # We no longer assume that "not in pending list" means "approved".
-            # This prevents denied users from re-entering automatically.
-            # If they were approved while offline, they'll be in ROOM_USERS on reconnect
-            # or they can just wait for a new approval.
-        
-        # 7. Always Sync the request count for the owner on connect
+                self.ROOM_REQUESTERS[self.room_slug][self.username] = self.channel_name
+                print(f"User {self.username} connected and is marked as PENDING.")
+
+                if is_still_pending_in_db:
+                    owner_channel = self.ROOM_OWNER_CHANNELS.get(self.room_slug)
+                    if owner_channel:
+                        async_to_sync(self.channel_layer.send)(
+                            owner_channel,
+                            {
+                                'type': 'join_request_notification',
+                                'requester_username': self.username,
+                            }
+                        )
+            else:
+                self.send(text_data=json.dumps({
+                    'type': 'session_status',
+                    'status': 'active'
+                }))
+
+                print(f"Adding user {self.username} to group {self.room_group_name}...")
+                async_to_sync(self.channel_layer.group_add)(
+                    self.room_group_name,
+                    self.channel_name
+                )
+                print(f"User {self.username} successfully added to group.")
+
+                user_joined = self.username not in self.ROOM_USERS.get(self.room_slug, {}) 
+                self.ROOM_USERS[self.room_slug][self.username] = self.channel_name 
+                
+                if self.is_owner:
+                    self.ROOM_OWNER_CHANNELS[self.room_slug] = self.channel_name
+                
+                if user_joined:
+                    self.USER_LAST_SEEN[self.room_slug][self.username] = timezone.now()
+                    self.send_system_message(f"{self.username} has joined the room.")
+                    
+                self.broadcast_user_list(send_join_message=False)
+
             if self.is_owner:
                 self.broadcast_request_count_to_owner() 
             
-        # 8. CLEANUP STALE USERS (New Logic)
-        # Check for users who disconnected > 2.5 minutes ago and haven't returned.
-        # This handles users who closed the tab but didn't trigger 'explicit_leave' 
-        # (e.g., browser crash or just closed tab on mobile)
             self.cleanup_stale_users()
-        
-        # --- CATCH-UP LOGIC START ---
-        # Only send history to users who are ACTIVE
+            
             if not self.is_pending:
                 last_seen_time = self.USER_LAST_SEEN.get(self.room_slug, {}).get(self.username)
                 if last_seen_time:
-                     self.send_catch_up_messages(last_seen_time)
+                    self.send_catch_up_messages(last_seen_time)
+
             logger.warning(
                 "WebSocket connect complete room=%s user=%s pending=%s active_users=%s",
                 self.room_slug,
